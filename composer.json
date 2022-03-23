@@ -1,0 +1,47 @@
+{
+    "name": "hughcube/laravel-package",
+    "description": "",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "hugh.li",
+            "email": "hugh.li@foxmail.com"
+        }
+    ],
+    "require": {
+        "php": "7.*|8.*",
+        "illuminate/support": ">=8.0"
+    },
+    "require-dev": {
+        "laravel/framework": "*",
+        "laravel/lumen-framework": "*",
+        "squizlabs/php_codesniffer": "*",
+        "phpstan/phpstan": "*",
+        "orchestra/testbench": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "HughCube\\Laravel\\Package\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "HughCube\\Laravel\\Package\\Tests\\": "tests"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "HughCube\\Laravel\\Package\\ServiceProvider"
+            ]
+        }
+    },
+    "scripts": {
+        "test": "phpunit --verbose --coverage-clover=coverage.clover",
+        "phpstan": "phpstan analyse -vvv",
+        "check-style": "phpcs -p --standard=PSR2 src/ -v",
+        "fix-style": "phpcbf -p --standard=PSR2 src/ -v"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}

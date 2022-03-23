@@ -1,0 +1,42 @@
+name: Test
+
+on: [ push, pull_request ]
+
+jobs:
+  run:
+    runs-on: ${{ matrix.operating-system }}
+    strategy:
+      max-parallel: 15
+      matrix:
+        operating-system: [ ubuntu-latest, windows-latest, macOS-latest ]
+        php-versions: [ '7.0', '7.1', '7.2', '7.3', '7.4', '8.0' ]
+    name: PHP ${{ matrix.php-versions }} Test on ${{ matrix.operating-system }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@master
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@master
+        with:
+          php-version: ${{ matrix.php-versions }}
+          extension-csv: mbstring, xdebug #optional, setup extensions
+          ini-values-csv: post_max_size=256M, short_open_tag=On #optional, setup php.ini configuration
+          coverage: xdebug #optional, setup coverage driver
+          pecl: true #optional, setup PECL
+
+      - name: System Setting
+        run: |
+          php -v
+          composer -V
+          php -m
+      - name: Validate composer.json and composer.lock
+        run: composer validate
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-suggest
+
+      - name: Run PHPUnit
+        run: |
+          composer run-script test
+          curl -o ocular.phar https://scrutinizer-ci.com/ocular.phar
+          php ocular.phar code-coverage:upload --format=php-clover coverage.clover

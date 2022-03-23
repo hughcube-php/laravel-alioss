@@ -1,0 +1,30 @@
+name: Lint
+
+on: [ push, pull_request ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: System Setting
+        run: |
+          php -v
+          composer -V
+          php -m
+
+      - name: Validate composer.json and composer.lock
+        run: composer validate
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-suggest
+
+      - name: Run check-style
+        run: composer run-script check-style
+
+      - name: Run php-cs-fxier
+        run: composer run-script fix-style
+
+      - name: Run phpstan
+        run: composer run-script phpstan
