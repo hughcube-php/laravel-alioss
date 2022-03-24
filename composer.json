@@ -12,7 +12,9 @@
         "php": ">=7.1",
         "illuminate/filesystem": "*",
         "league/flysystem": "*",
-        "aliyuncs/oss-sdk-php": "*"
+        "aliyuncs/oss-sdk-php": "*",
+        "hughcube/purl": "*",
+        "hughcube/guzzle-http": "*"
     },
     "require-dev": {
         "laravel/framework": "*",

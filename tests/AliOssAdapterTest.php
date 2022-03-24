@@ -9,8 +9,11 @@
 namespace HughCube\Laravel\AliOSS\Tests;
 
 use Exception;
+use GuzzleHttp\Exception\GuzzleException;
+use HughCube\GuzzleHttp\HttpClientTrait;
 use HughCube\Laravel\AliOSS\Acl;
 use HughCube\Laravel\AliOSS\OssAdapter;
+use HughCube\PUrl\HUrl;
 use Illuminate\Support\Str;
 use League\Flysystem\Config;
 use League\Flysystem\FilesystemException;
@@ -20,6 +23,29 @@ use OSS\OssClient;
 
 class AliOssAdapterTest extends TestCase
 {
+    use HttpClientTrait;
+
+    /**
+     * @throws Exception
+     */
+    public function makeAliOssAdapter(): array
+    {
+        return [
+            [
+                new OssAdapter([
+                    'driver' => 'alioss',
+                    'accessKeyId' => env('ALIOSS_ACCESS_KEY_ID'),
+                    'accessKeySecret' => env('ALIOSS_ACCESS_KEY_SECRET'),
+                    'endpoint' => env('ALIOSS_ENDPOINT'),
+                    'bucket' => env('ALIOSS_BUCKET'),
+                    'isCName' => env('ALIOSS_IS_CNAME'),
+                    'securityToken' => env('ALIOSS_SECURITY_TOKEN'),
+                    'requestProxy' => env('ALIOSS_REQUEST_PROXY'),
+                ])
+            ]
+        ];
+    }
+
     /**
      * @dataProvider makeAliOssAdapter
      */
@@ -295,23 +321,90 @@ class AliOssAdapterTest extends TestCase
     }
 
     /**
-     * @throws Exception
+     * @dataProvider makeAliOssAdapter
+     * @throws OssException
      */
-    public function makeAliOssAdapter(): array
+    public function testUrl(OssAdapter $adapter)
     {
-        return [
-            [
-                new OssAdapter([
-                    'driver' => 'alioss',
-                    'accessKeyId' => env('ALIOSS_ACCESS_KEY_ID'),
-                    'accessKeySecret' => env('ALIOSS_ACCESS_KEY_SECRET'),
-                    'endpoint' => env('ALIOSS_ENDPOINT'),
-                    'bucket' => env('ALIOSS_BUCKET'),
-                    'isCName' => env('ALIOSS_IS_CNAME'),
-                    'securityToken' => env('ALIOSS_SECURITY_TOKEN'),
-                    'requestProxy' => env('ALIOSS_REQUEST_PROXY'),
-                ])
-            ]
-        ];
+        $path = sprintf("oss-test/%s/%s.txt", __METHOD__, Str::random(32));
+
+        $url = $adapter->url($path);
+        $this->assertTrue(HUrl::isUrlString($url));
+    }
+
+    /**
+     * @dataProvider makeAliOssAdapter
+     * @throws OssException
+     * @throws FilesystemException
+     * @throws GuzzleException
+     */
+    public function testSignUrl(OssAdapter $adapter)
+    {
+        $content = Str::random();
+        $path = sprintf("oss-test/%s/%s.txt", __METHOD__, Str::random(32));
+
+        $adapter->write($path, $content, new Config());
+        $this->assertTrue($adapter->fileExists($path));
+
+        $url = $adapter->signUrl($path);
+        $this->assertTrue(HUrl::isUrlString($url));
+
+        $this->assertSame(
+            $this->getHttpClient()->get($url)->getBody()->getContents(),
+            $content
+        );
+    }
+
+    /**
+     * @dataProvider makeAliOssAdapter
+     * @throws OssException
+     * @throws FilesystemException
+     * @throws GuzzleException
+     */
+    public function testWriteFromUrl(OssAdapter $adapter)
+    {
+        $content = Str::random();
+        $source = sprintf("oss-test/%s/%s.txt", __METHOD__, Str::random(32));
+        $adapter->write($source, $content, new Config());
+        $this->assertTrue($adapter->fileExists($source));
+
+        $path = sprintf("oss-test/%s/%s.txt", __METHOD__, Str::random(32));
+        $adapter->putUrl($adapter->signUrl($source), $path);
+        $this->assertSame($adapter->read($path), $content);
+    }
+
+    /**
+     * @dataProvider makeAliOssAdapter
+     * @throws FilesystemException
+     */
+    public function testPutFile(OssAdapter $adapter)
+    {
+        $content = Str::random();
+        $file = tempnam("/tmp", "aliOssTest_");
+        file_put_contents($file, $content, LOCK_EX);
+
+        $path = sprintf("oss-test/%s/%s.txt", __METHOD__, Str::random(32));
+        $adapter->putFile($file, $path);
+
+        $this->assertTrue($adapter->fileExists($path));
+        $this->assertSame($adapter->read($path), $content);
+    }
+
+    /**
+     * @dataProvider makeAliOssAdapter
+     * @throws FilesystemException
+     */
+    public function testDownload(OssAdapter $adapter)
+    {
+        $content = Str::random();
+        $path = sprintf("oss-test/%s/%s.txt", __METHOD__, Str::random(32));
+
+        $adapter->write($path, $content, new Config());
+        $this->assertTrue($adapter->fileExists($path));
+
+        $file = tempnam("/tmp", "aliOssTest_");
+        $adapter->download($path, $file);
+
+        $this->assertSame(file_get_contents($file), $content);
     }
 }
