@@ -9,8 +9,10 @@
         }
     ],
     "require": {
-        "php": "7.*|8.*",
-        "illuminate/support": ">=8.0"
+        "php": ">=7.1",
+        "illuminate/filesystem": "*",
+        "league/flysystem": "*",
+        "aliyuncs/oss-sdk-php": "*"
     },
     "require-dev": {
         "laravel/framework": "*",
@@ -21,18 +23,18 @@
     },
     "autoload": {
         "psr-4": {
-            "HughCube\\Laravel\\Package\\": "src"
+            "HughCube\\Laravel\\AliOSS\\": "src"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "HughCube\\Laravel\\Package\\Tests\\": "tests"
+            "HughCube\\Laravel\\AliOSS\\Tests\\": "tests"
         }
     },
     "extra": {
         "laravel": {
             "providers": [
-                "HughCube\\Laravel\\Package\\ServiceProvider"
+                "HughCube\\Laravel\\AliOSS\\ServiceProvider"
             ]
         }
     },

@@ -6,10 +6,9 @@
  * Time: 11:36 下午.
  */
 
-namespace HughCube\Laravel\Package\Tests;
+namespace HughCube\Laravel\AliOSS\Tests;
 
-use HughCube\Laravel\Package\Package;
-use HughCube\Laravel\Package\ServiceProvider as PackageServiceProvider;
+use HughCube\Laravel\AliOSS\ServiceProvider as PackageServiceProvider;
 use Illuminate\Config\Repository;
 use Illuminate\Foundation\Application;
 use Orchestra\Testbench\TestCase as OrchestraTestCase;
@@ -33,32 +32,20 @@ class TestCase extends OrchestraTestCase
      */
     protected function getEnvironmentSetUp($app)
     {
-        $this->setupCache($app);
+        parent::getEnvironmentSetUp($app);
 
-        /** @var Repository $appConfig */
-        $appConfig = $app['config'];
-        $appConfig->set(
-            Package::getFacadeAccessor(),
-            (require dirname(__DIR__).'/config/config.php')
-        );
-    }
+        /** @var Repository $config */
+        $config = $app['config'];
 
-    /**
-     * @param  Application  $app
-     */
-    protected function setupCache(Application $app)
-    {
-        /** @var Repository $appConfig */
-        $appConfig = $app['config'];
-
-        $appConfig->set('cache', [
-            'default' => 'default',
-            'stores' => [
-                'default' => [
-                    'driver' => 'file',
-                    'path' => sprintf('/tmp/test/%s', md5(serialize([__METHOD__]))),
-                ],
-            ],
+        $config->set('filesystems.disks.alioss', [
+            'driver' => 'alioss',
+            'accessKeyId' => env('ALIOSS_ACCESS_KEY_ID'),
+            'accessKeySecret' => env('ALIOSS_ACCESS_KEY_SECRET'),
+            'endpoint' => env('ALIOSS_ENDPOINT'),
+            'bucket' => env('ALIOSS_BUCKET'),
+            'isCName' => env('ALIOSS_IS_CNAME'),
+            'securityToken' => env('ALIOSS_SECURITY_TOKEN'),
+            'requestProxy' => env('ALIOSS_REQUEST_PROXY'),
         ]);
     }
 }

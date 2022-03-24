@@ -6,11 +6,12 @@
  * Time: 10:32 下午.
  */
 
-namespace HughCube\Laravel\Package;
+namespace HughCube\Laravel\AliOSS;
 
-use Illuminate\Foundation\Application as LaravelApplication;
+use Illuminate\Filesystem\FilesystemAdapter;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\ServiceProvider as IlluminateServiceProvider;
-use Laravel\Lumen\Application as LumenApplication;
+use League\Flysystem\Filesystem;
 
 class ServiceProvider extends IlluminateServiceProvider
 {
@@ -19,22 +20,9 @@ class ServiceProvider extends IlluminateServiceProvider
      */
     public function boot()
     {
-        $source = realpath(dirname(__DIR__).'/config/config.php');
-
-        if ($this->app instanceof LaravelApplication && $this->app->runningInConsole()) {
-            $this->publishes([$source => config_path(sprintf("%s.php", Package::getFacadeAccessor()))]);
-        } elseif ($this->app instanceof LumenApplication) {
-            $this->app->configure(Package::getFacadeAccessor());
-        }
-    }
-
-    /**
-     * Register the provider.
-     */
-    public function register()
-    {
-        $this->app->singleton(Package::getFacadeAccessor(), function ($app) {
-            return new Manager();
+        Storage::extend('alioss', function ($app, $config) {
+            $adapter = new OssAdapter($config);
+            return new FilesystemAdapter(new Filesystem($adapter), $adapter, $config);
         });
     }
 }

@@ -18,4 +18,13 @@
             <directory suffix=".php">src/</directory>
         </whitelist>
     </filter>
+    <php>
+        <env name="ALIOSS_ACCESS_KEY_ID" value="" force="true"/>
+        <env name="ALIOSS_ACCESS_KEY_SECRET" value="" force="true"/>
+        <env name="ALIOSS_ENDPOINT" value="" force="true"/>
+        <env name="ALIOSS_BUCKET" value="" force="true"/>
+        <env name="ALIOSS_IS_CNAME" value="false" force="true"/>
+        <env name="ALIOSS_SECURITY_TOKEN" value="" force="true"/>
+        <env name="requestProxy" value="" force="true"/>
+    </php>
 </phpunit>
