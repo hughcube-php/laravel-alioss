@@ -39,7 +39,7 @@ $ composer require hughcube/laravel-alioss -vvv
 ## Configuration
 
 ```shell
-$ php artisan vendor:publish --provider="HughCube\Laravel\CaptchaCode\ServiceProvider"
+$ php artisan vendor:publish --provider="HughCube\Laravel\AliOSS\ServiceProvider"
 ```
 
 ## Usage
