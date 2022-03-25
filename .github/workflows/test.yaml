@@ -35,8 +35,6 @@ jobs:
       - name: Install dependencies
         run: composer install --prefer-dist --no-progress --no-suggest
 
-#      - name: Run PHPUnit
-#        run: |
-#          composer run-script test
-#          curl -o ocular.phar https://scrutinizer-ci.com/ocular.phar
-#          php ocular.phar code-coverage:upload --format=php-clover coverage.clover
+      - name: Run PHPUnit
+        run: |
+          ./vendor/bin/phpunit ./tests/ --exclude-group authCase

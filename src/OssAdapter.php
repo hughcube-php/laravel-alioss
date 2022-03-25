@@ -19,6 +19,9 @@ use League\Flysystem\FilesystemException;
 use OSS\Core\OssException;
 use OSS\OssClient;
 
+/**
+ * @mixin OssClient
+ */
 class OssAdapter implements FilesystemAdapter
 {
     use HttpClientTrait;
@@ -66,20 +69,17 @@ class OssAdapter implements FilesystemAdapter
         return $this->config['bucket'];
     }
 
-    /**
-     * @throws OssException
-     */
-    public function getDefaultAcl()
+    public function getCdnBaseUrl()
     {
-        return $this->config['acl'] ?? $this->getBucketAcl();
+        return $this->config['cdnBaseUrl'];
     }
 
     /**
      * @throws OssException
      */
-    public function getBucketAcl(): string
+    public function getDefaultAcl()
     {
-        return $this->getOssClient()->getBucketAcl($this->getBucket());
+        return $this->config['acl'] ?? $this->getOssClient()->getBucketAcl($this->getBucket());
     }
 
     /**
@@ -250,18 +250,32 @@ class OssAdapter implements FilesystemAdapter
         );
     }
 
-    /**
-     * @throws OssException
-     */
-    public function url($path): string
+    public function cdnUrl($path): string
     {
-        return HUrl::instance($this->signUrl($path))->withQueryArray([])->toString();
+        $url = HUrl::parse($path);
+        if (!$url instanceof HUrl) {
+            return sprintf('%s/%s', rtrim($this->getCdnBaseUrl(), '/'), ltrim($path, '/'));
+        }
+
+        $baseUrl = HUrl::instance($this->getCdnBaseUrl());
+        return $url
+            ->withHost($baseUrl->getHost())
+            ->withScheme($baseUrl->getScheme())
+            ->toString();
     }
 
     /**
      * @throws OssException
      */
-    public function signUrl($path, $timeout = 60, $method = OssClient::OSS_HTTP_GET, Config $config = null): string
+    public function url($path): string
+    {
+        return HUrl::instance($this->authUrl($path))->withQueryArray([])->toString();
+    }
+
+    /**
+     * @throws OssException
+     */
+    public function authUrl($path, $timeout = 60, $method = OssClient::OSS_HTTP_GET, Config $config = null): string
     {
         $config = $config ?? new Config();
 
@@ -309,8 +323,19 @@ class OssAdapter implements FilesystemAdapter
 
     public function download($path, $file)
     {
-        $this->getOssClient()->getObject($this->getBucket(), $path, [
-            OssClient::OSS_FILE_DOWNLOAD => $file
-        ]);
+        $this->getOssClient()->getObject($this->getBucket(), $path, [OssClient::OSS_FILE_DOWNLOAD => $file]);
+    }
+
+    /**
+     * Pass dynamic methods call onto oss.
+     *
+     * @param  string  $method
+     * @param  array  $parameters
+     * @return mixed
+     * @throws BadMethodCallException
+     */
+    public function __call(string $method, array $parameters)
+    {
+        return $this->getOssClient()->{$method}(...$parameters);
     }
 }

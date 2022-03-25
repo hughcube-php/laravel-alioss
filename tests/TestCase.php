@@ -8,8 +8,13 @@
 
 namespace HughCube\Laravel\AliOSS\Tests;
 
-use HughCube\Laravel\AliOSS\ServiceProvider as PackageServiceProvider;
+use BadMethodCallException;
+use HughCube\Laravel\AliOSS\OssAdapter;
+use HughCube\Laravel\AliOSS\ServiceProvider;
 use Illuminate\Config\Repository;
+use Illuminate\Filesystem\FilesystemAdapter;
+use Illuminate\Filesystem\FilesystemManager;
+use Illuminate\Filesystem\FilesystemServiceProvider;
 use Illuminate\Foundation\Application;
 use Orchestra\Testbench\TestCase as OrchestraTestCase;
 
@@ -23,7 +28,8 @@ class TestCase extends OrchestraTestCase
     protected function getPackageProviders($app): array
     {
         return [
-            PackageServiceProvider::class,
+            FilesystemServiceProvider::class,
+            ServiceProvider::class,
         ];
     }
 
@@ -47,5 +53,20 @@ class TestCase extends OrchestraTestCase
             'securityToken' => env('ALIOSS_SECURITY_TOKEN'),
             'requestProxy' => env('ALIOSS_REQUEST_PROXY'),
         ]);
+    }
+
+    protected function getOssAdapter(): OssAdapter
+    {
+        /** @var FilesystemManager $manager */
+        $manager = $this->app['filesystem'];
+        $disk = $manager->disk('alioss');
+
+        /** @var OssAdapter $adapter */
+        $adapter = $disk instanceof FilesystemAdapter ? $disk->getAdapter() : null;
+        if (!$adapter instanceof OssAdapter) {
+            throw new BadMethodCallException('Can only be called to alioss drives!');
+        }
+
+        return $adapter;
     }
 }
