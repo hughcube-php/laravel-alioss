@@ -15,7 +15,6 @@ use HughCube\Laravel\AliOSS\OssAdapter;
 use HughCube\PUrl\HUrl;
 use Illuminate\Support\Str;
 use League\Flysystem\Config;
-use League\Flysystem\FilesystemAdapter;
 use League\Flysystem\FilesystemException;
 use League\Flysystem\Visibility;
 use OSS\Core\OssException;
@@ -55,8 +54,6 @@ class OssAdapterTest extends TestCase
         $adapter->deleteObjects($adapter->getBucket(), $objects);
     }
 
-    /**
-     */
     public function testGetOssClient()
     {
         $this->caseWithClear(function (OssAdapter $adapter) {
@@ -65,13 +62,13 @@ class OssAdapterTest extends TestCase
     }
 
     /**
-     * @throws  FilesystemException
+     * @throws FilesystemException
      */
     public function testFileExists()
     {
         $this->caseWithClear(function (OssAdapter $adapter) {
             $content = Str::random();
-            $path = sprintf("oss-test/%s/%s.txt", __METHOD__, Str::random(32));
+            $path = sprintf('oss-test/%s/%s.txt', __METHOD__, Str::random(32));
 
             $this->assertFalse($adapter->fileExists($path));
             $adapter->getOssClient()->putObject($adapter->getBucket(), $path, $content);
@@ -80,30 +77,27 @@ class OssAdapterTest extends TestCase
     }
 
     /**
-     *
      * @throws FilesystemException
      */
     public function testDirectoryExists()
     {
         $this->caseWithClear(function (OssAdapter $adapter) {
-            $path = sprintf("oss-test/%s/%s/", __METHOD__, Str::random(32));
+            $path = sprintf('oss-test/%s/%s/', __METHOD__, Str::random(32));
 
-            #$this->assertFalse($adapter->directoryExists($path));
+            //$this->assertFalse($adapter->directoryExists($path));
             $adapter->getOssClient()->createObjectDir($adapter->getBucket(), $path);
             $this->assertTrue($adapter->directoryExists($path));
         });
     }
 
     /**
-     *
      * @throws FilesystemException
      */
     public function testWrite(): void
     {
         $this->caseWithClear(function (OssAdapter $adapter) {
-
             $content = Str::random();
-            $path = sprintf("oss-test/%s/%s.txt", __METHOD__, Str::random(32));
+            $path = sprintf('oss-test/%s/%s.txt', __METHOD__, Str::random(32));
 
             $adapter->write($path, $content, new Config());
 
@@ -112,15 +106,13 @@ class OssAdapterTest extends TestCase
     }
 
     /**
-     *
      * @throws FilesystemException
      */
     public function testWriteStream(): void
     {
         $this->caseWithClear(function (OssAdapter $adapter) {
-
             $content = Str::random();
-            $path = sprintf("oss-test/%s/%s.txt", __METHOD__, Str::random(32));
+            $path = sprintf('oss-test/%s/%s.txt', __METHOD__, Str::random(32));
 
             $stream = fopen('php://temp', 'w+b');
             fwrite($stream, $content);
@@ -134,7 +126,6 @@ class OssAdapterTest extends TestCase
     }
 
     /**
-     *
      * @throws FilesystemException
      */
     public function testRead()
@@ -143,7 +134,7 @@ class OssAdapterTest extends TestCase
             $adapter = $this->getOssAdapter();
 
             $content = Str::random();
-            $path = sprintf("oss-test/%s/%s.txt", __METHOD__, Str::random(32));
+            $path = sprintf('oss-test/%s/%s.txt', __METHOD__, Str::random(32));
 
             $adapter->write($path, $content, new Config());
             $this->assertSame($adapter->read($path), $content);
@@ -151,15 +142,13 @@ class OssAdapterTest extends TestCase
     }
 
     /**
-     *
      * @throws FilesystemException
      */
     public function testReadStream()
     {
         $this->caseWithClear(function (OssAdapter $adapter) {
-
             $content = Str::random();
-            $path = sprintf("oss-test/%s/%s.txt", __METHOD__, Str::random(32));
+            $path = sprintf('oss-test/%s/%s.txt', __METHOD__, Str::random(32));
 
             $adapter->write($path, $content, new Config());
             $stream = $adapter->readStream($path);
@@ -170,15 +159,13 @@ class OssAdapterTest extends TestCase
     }
 
     /**
-     *
      * @throws FilesystemException
      */
     public function testDelete()
     {
         $this->caseWithClear(function (OssAdapter $adapter) {
-
             $content = Str::random();
-            $path = sprintf("oss-test/%s/%s.txt", __METHOD__, Str::random(32));
+            $path = sprintf('oss-test/%s/%s.txt', __METHOD__, Str::random(32));
 
             $adapter->write($path, $content, new Config());
             $this->assertTrue($adapter->fileExists($path));
@@ -189,30 +176,25 @@ class OssAdapterTest extends TestCase
     }
 
     /**
-     *
      * @throws FilesystemException
      */
     public function testDeleteDirectory()
     {
         $this->caseWithClear(function (OssAdapter $adapter) {
-
-            $path = sprintf("oss-test/%s/%s.txt", __METHOD__, Str::random(32));
+            $path = sprintf('oss-test/%s/%s.txt', __METHOD__, Str::random(32));
 
             $adapter->deleteDirectory($path);
             $this->assertTrue(true);
         });
     }
 
-
     /**
-     *
      * @throws FilesystemException
      */
     public function testCreateDirectory()
     {
         $this->caseWithClear(function (OssAdapter $adapter) {
-
-            $path = sprintf("oss-test/%s/%s.txt", __METHOD__, Str::random(32));
+            $path = sprintf('oss-test/%s/%s.txt', __METHOD__, Str::random(32));
 
             $adapter->createDirectory($path, new Config());
             $this->assertTrue(true);
@@ -220,16 +202,14 @@ class OssAdapterTest extends TestCase
     }
 
     /**
-     *
      * @throws FilesystemException
      * @throws OssException
      */
     public function testSetVisibility()
     {
         $this->caseWithClear(function (OssAdapter $adapter) {
-
             $content = Str::random();
-            $path = sprintf("oss-test/%s/%s.txt", __METHOD__, Str::random(32));
+            $path = sprintf('oss-test/%s/%s.txt', __METHOD__, Str::random(32));
 
             $adapter->write($path, $content, new Config());
             $this->assertTrue($adapter->fileExists($path));
@@ -244,16 +224,14 @@ class OssAdapterTest extends TestCase
     }
 
     /**
-     *
      * @throws FilesystemException
      * @throws OssException
      */
     public function testVisibility()
     {
         $this->caseWithClear(function (OssAdapter $adapter) {
-
             $content = Str::random();
-            $path = sprintf("oss-test/%s/%s.txt", __METHOD__, Str::random(32));
+            $path = sprintf('oss-test/%s/%s.txt', __METHOD__, Str::random(32));
 
             $adapter->write($path, $content, new Config());
             $this->assertTrue($adapter->fileExists($path));
@@ -268,15 +246,13 @@ class OssAdapterTest extends TestCase
     }
 
     /**
-     *
      * @throws FilesystemException
      */
     public function testMimeType()
     {
         $this->caseWithClear(function (OssAdapter $adapter) {
-
             $content = Str::random();
-            $path = sprintf("oss-test/%s/%s.txt", __METHOD__, Str::random(32));
+            $path = sprintf('oss-test/%s/%s.txt', __METHOD__, Str::random(32));
 
             $adapter->write($path, $content, new Config());
             $this->assertTrue($adapter->fileExists($path));
@@ -287,15 +263,13 @@ class OssAdapterTest extends TestCase
     }
 
     /**
-     *
      * @throws FilesystemException
      */
     public function testLastModified()
     {
         $this->caseWithClear(function (OssAdapter $adapter) {
-
             $content = Str::random();
-            $path = sprintf("oss-test/%s/%s.txt", __METHOD__, Str::random(32));
+            $path = sprintf('oss-test/%s/%s.txt', __METHOD__, Str::random(32));
 
             $adapter->write($path, $content, new Config());
             $this->assertTrue($adapter->fileExists($path));
@@ -306,15 +280,13 @@ class OssAdapterTest extends TestCase
     }
 
     /**
-     *
      * @throws FilesystemException
      */
     public function testFileSize()
     {
         $this->caseWithClear(function (OssAdapter $adapter) {
-
             $content = Str::random();
-            $path = sprintf("oss-test/%s/%s.txt", __METHOD__, Str::random(32));
+            $path = sprintf('oss-test/%s/%s.txt', __METHOD__, Str::random(32));
 
             $adapter->write($path, $content, new Config());
             $this->assertTrue($adapter->fileExists($path));
@@ -330,21 +302,19 @@ class OssAdapterTest extends TestCase
     }
 
     /**
-     *
      * @throws FilesystemException
      * @throws OssException
      */
     public function testMove()
     {
         $this->caseWithClear(function (OssAdapter $adapter) {
-
             $content = Str::random();
-            $source = sprintf("oss-test/%s/%s.txt", __METHOD__, Str::random(32));
+            $source = sprintf('oss-test/%s/%s.txt', __METHOD__, Str::random(32));
 
             $adapter->write($source, $content, new Config());
             $this->assertTrue($adapter->fileExists($source));
 
-            $destination = sprintf("oss-test/%s/move/%s.txt", __METHOD__, Str::random(32));
+            $destination = sprintf('oss-test/%s/move/%s.txt', __METHOD__, Str::random(32));
             $adapter->move($source, $destination, new Config());
             $this->assertTrue($adapter->fileExists($destination));
 
@@ -353,35 +323,31 @@ class OssAdapterTest extends TestCase
     }
 
     /**
-     *
      * @throws FilesystemException
      * @throws OssException
      */
     public function testCopy()
     {
         $this->caseWithClear(function (OssAdapter $adapter) {
-
             $content = Str::random();
-            $source = sprintf("oss-test/%s/%s.txt", __METHOD__, Str::random(32));
+            $source = sprintf('oss-test/%s/%s.txt', __METHOD__, Str::random(32));
 
             $adapter->write($source, $content, new Config());
             $this->assertTrue($adapter->fileExists($source));
 
-            $destination = sprintf("oss-test/%s/copy/%s.txt", __METHOD__, Str::random(32));
+            $destination = sprintf('oss-test/%s/copy/%s.txt', __METHOD__, Str::random(32));
             $adapter->copy($source, $destination, new Config());
             $this->assertTrue($adapter->fileExists($destination));
         });
     }
 
     /**
-     *
      * @throws OssException
      */
     public function testUrl()
     {
         $this->caseWithClear(function (OssAdapter $adapter) {
-
-            $path = sprintf("oss-test/%s/%s.txt", __METHOD__, Str::random(32));
+            $path = sprintf('oss-test/%s/%s.txt', __METHOD__, Str::random(32));
 
             $url = $adapter->url($path);
             $this->assertTrue(HUrl::isUrlString($url));
@@ -389,7 +355,6 @@ class OssAdapterTest extends TestCase
     }
 
     /**
-     *
      * @throws OssException
      * @throws FilesystemException
      * @throws GuzzleException
@@ -397,9 +362,8 @@ class OssAdapterTest extends TestCase
     public function testAuthUrl()
     {
         $this->caseWithClear(function (OssAdapter $adapter) {
-
             $content = Str::random();
-            $path = sprintf("oss-test/%s/%s.txt", __METHOD__, Str::random(32));
+            $path = sprintf('oss-test/%s/%s.txt', __METHOD__, Str::random(32));
 
             $adapter->write($path, $content, new Config());
             $this->assertTrue($adapter->fileExists($path));
@@ -415,7 +379,6 @@ class OssAdapterTest extends TestCase
     }
 
     /**
-     *
      * @throws OssException
      * @throws FilesystemException
      * @throws GuzzleException
@@ -423,31 +386,28 @@ class OssAdapterTest extends TestCase
     public function testWriteFromUrl()
     {
         $this->caseWithClear(function (OssAdapter $adapter) {
-
             $content = Str::random();
-            $source = sprintf("oss-test/%s/%s.txt", __METHOD__, Str::random(32));
+            $source = sprintf('oss-test/%s/%s.txt', __METHOD__, Str::random(32));
             $adapter->write($source, $content, new Config());
             $this->assertTrue($adapter->fileExists($source));
 
-            $path = sprintf("oss-test/%s/%s.txt", __METHOD__, Str::random(32));
+            $path = sprintf('oss-test/%s/%s.txt', __METHOD__, Str::random(32));
             $adapter->putUrl($adapter->authUrl($source), $path);
             $this->assertSame($adapter->read($path), $content);
         });
     }
 
     /**
-     *
      * @throws FilesystemException
      */
     public function testPutFile()
     {
         $this->caseWithClear(function (OssAdapter $adapter) {
-
             $content = Str::random();
-            $file = tempnam("/tmp", "aliOssTest_");
+            $file = tempnam('/tmp', 'aliOssTest_');
             file_put_contents($file, $content, LOCK_EX);
 
-            $path = sprintf("oss-test/%s/%s.txt", __METHOD__, Str::random(32));
+            $path = sprintf('oss-test/%s/%s.txt', __METHOD__, Str::random(32));
             $adapter->putFile($file, $path);
 
             $this->assertTrue($adapter->fileExists($path));
@@ -456,20 +416,18 @@ class OssAdapterTest extends TestCase
     }
 
     /**
-     *
      * @throws FilesystemException
      */
     public function testDownload()
     {
         $this->caseWithClear(function (OssAdapter $adapter) {
-
             $content = Str::random();
-            $path = sprintf("oss-test/%s/%s.txt", __METHOD__, Str::random(32));
+            $path = sprintf('oss-test/%s/%s.txt', __METHOD__, Str::random(32));
 
             $adapter->write($path, $content, new Config());
             $this->assertTrue($adapter->fileExists($path));
 
-            $file = tempnam("/tmp", "aliOssTest_");
+            $file = tempnam('/tmp', 'aliOssTest_');
             $adapter->download($path, $file);
 
             $this->assertSame(file_get_contents($file), $content);

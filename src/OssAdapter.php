@@ -3,7 +3,7 @@
  * Created by PhpStorm.
  * User: hugh.li
  * Date: 2022/3/23
- * Time: 23:00
+ * Time: 23:00.
  */
 
 namespace HughCube\Laravel\AliOSS;
@@ -37,7 +37,7 @@ class OssAdapter implements FilesystemAdapter
     protected $ossClient;
 
     /**
-     * @param  array  $config
+     * @param array $config
      */
     public function __construct(array $config)
     {
@@ -148,7 +148,7 @@ class OssAdapter implements FilesystemAdapter
      */
     public function deleteDirectory(string $path): void
     {
-        return;
+
     }
 
     /**
@@ -161,6 +161,7 @@ class OssAdapter implements FilesystemAdapter
 
     /**
      * @inheritDoc
+     *
      * @throws OssException
      */
     public function setVisibility(string $path, string $visibility): void
@@ -170,6 +171,7 @@ class OssAdapter implements FilesystemAdapter
 
     /**
      * @inheritDoc
+     *
      * @throws OssException
      */
     public function visibility(string $path): FileAttributes
@@ -214,6 +216,7 @@ class OssAdapter implements FilesystemAdapter
 
     /**
      * @inheritDoc
+     *
      * @throws OssException
      */
     public function copy(string $source, string $destination, Config $config): void
@@ -229,6 +232,7 @@ class OssAdapter implements FilesystemAdapter
 
     /**
      * @inheritDoc
+     *
      * @throws OssException
      */
     public function move(string $source, string $destination, Config $config): void
@@ -258,6 +262,7 @@ class OssAdapter implements FilesystemAdapter
         }
 
         $baseUrl = HUrl::instance($this->getCdnBaseUrl());
+
         return $url
             ->withHost($baseUrl->getHost())
             ->withScheme($baseUrl->getScheme())
@@ -329,10 +334,12 @@ class OssAdapter implements FilesystemAdapter
     /**
      * Pass dynamic methods call onto oss.
      *
-     * @param  string  $method
-     * @param  array  $parameters
-     * @return mixed
+     * @param string $method
+     * @param array  $parameters
+     *
      * @throws BadMethodCallException
+     *
+     * @return mixed
      */
     public function __call(string $method, array $parameters)
     {
