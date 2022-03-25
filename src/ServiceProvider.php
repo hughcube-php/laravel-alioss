@@ -22,6 +22,7 @@ class ServiceProvider extends IlluminateServiceProvider
     {
         Storage::extend('alioss', function ($app, $config) {
             $adapter = new OssAdapter($config);
+
             return new FilesystemAdapter(new Filesystem($adapter), $adapter, $config);
         });
     }
