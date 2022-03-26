@@ -18,7 +18,7 @@ use OSS\OssClient;
 use RuntimeException;
 
 /**
- * @method static Config forbidOverwriteConfig()
+ * @method static Config forbidOverwritePutConfig()
  * @method static OssAdapter withConfig()
  * @method static OssAdapter withBucket(string $bucket)
  * @method static PathPrefixer getPrefixer()

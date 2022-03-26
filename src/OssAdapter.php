@@ -44,7 +44,7 @@ class OssAdapter implements FilesystemAdapter
     }
 
     #[Pure]
-    public function forbidOverwriteConfig(): Config
+    public function forbidOverwritePutConfig(): Config
     {
         return new Config([
             'options' => [
