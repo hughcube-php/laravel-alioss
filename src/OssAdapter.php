@@ -14,10 +14,11 @@ use HughCube\GuzzleHttp\HttpClientTrait;
 use HughCube\PUrl\HUrl;
 use HughCube\PUrl\Url;
 use Illuminate\Support\Str;
+use JetBrains\PhpStorm\Pure;
 use League\Flysystem\Config;
 use League\Flysystem\FileAttributes;
 use League\Flysystem\FilesystemAdapter;
-use League\Flysystem\FilesystemException;
+use League\Flysystem\PathPrefixer;
 use OSS\Core\OssException;
 use OSS\OssClient;
 
@@ -28,16 +29,31 @@ class OssAdapter implements FilesystemAdapter
 {
     use HttpClientTrait;
 
-    protected array $config;
+    private array $config;
 
-    protected null|OssClient $ossClient = null;
+    private null|OssClient $ossClient = null;
+
+    private null|PathPrefixer $prefixer = null;
 
     /**
-     * @param array $config
+     * @param  array  $config
      */
     public function __construct(array $config)
     {
         $this->config = $config;
+    }
+
+    #[Pure]
+    public function withConfig(array $config = []): static
+    {
+        /** @phpstan-ignore-next-line */
+        return new static(array_merge($this->config, $config));
+    }
+
+    #[Pure]
+    public function withBucket(string $bucket): static
+    {
+        return $this->withConfig(['bucket' => $bucket]);
     }
 
     /**
@@ -60,6 +76,15 @@ class OssAdapter implements FilesystemAdapter
         return $this->ossClient;
     }
 
+    public function getPrefixer(): PathPrefixer
+    {
+        if (!$this->prefixer instanceof PathPrefixer) {
+            $this->prefixer = new PathPrefixer((($this->config['prefix'] ?? '') ?: ''), DIRECTORY_SEPARATOR);
+        }
+
+        return $this->prefixer;
+    }
+
     public function getBucket()
     {
         return $this->config['bucket'];
@@ -70,14 +95,13 @@ class OssAdapter implements FilesystemAdapter
         return ($this->config['cdnBaseUrl'] ?? null) ?: null;
     }
 
-    public function getPrefix()
+    public function makePath(string $path, Config $config = null): string
     {
-        return ($this->config['prefix'] ?? null) ?: null;
-    }
+        if (!$config instanceof Config || null === $config->get('with_prefix') || $config->get('with_prefix')) {
+            return $this->getPrefixer()->prefixPath($path);
+        }
 
-    public function makePath(string $path): string
-    {
-        return trim(sprintf('/%s/%s', trim($this->getPrefix()), ltrim($path)));
+        return $path;
     }
 
     /**
@@ -91,15 +115,21 @@ class OssAdapter implements FilesystemAdapter
     /**
      * @inheritDoc
      */
-    public function fileExists(string $path): bool
+    public function fileExists(string $path, Config $config = null): bool
     {
-        return $this->getOssClient()->doesObjectExist($this->getBucket(), $path);
+        $config = $config ?? new Config();
+
+        return $this->getOssClient()->doesObjectExist(
+            $this->getBucket(),
+            ltrim($this->makePath($path, $config), '/'),
+            $config->get('options')
+        );
     }
 
     /**
      * @inheritDoc
      */
-    public function directoryExists(string $path): bool
+    public function directoryExists(string $path, Config $config = null): bool
     {
         return true;
     }
@@ -110,7 +140,13 @@ class OssAdapter implements FilesystemAdapter
     public function write(string $path, string $contents, Config $config = null): void
     {
         $config = $config ?? new Config();
-        $this->getOssClient()->putObject($this->getBucket(), $path, $contents, $config->get('options'));
+
+        $this->getOssClient()->putObject(
+            $this->getBucket(),
+            ltrim($this->makePath($path, $config), '/'),
+            $contents,
+            $config->get('options')
+        );
     }
 
     /**
@@ -119,25 +155,45 @@ class OssAdapter implements FilesystemAdapter
     public function writeStream(string $path, $contents, Config $config = null): void
     {
         $config = $config ?? new Config();
-        $this->write($path, stream_get_contents($contents), $config);
+
+        $this->getOssClient()->putObject(
+            $this->getBucket(),
+            ltrim($this->makePath($path, $config), '/'),
+            stream_get_contents($contents),
+            $config->get('options')
+        );
     }
 
     /**
      * @inheritDoc
      */
-    public function read(string $path): string
+    public function read(string $path, Config $config = null): string
     {
-        return $this->getOssClient()->getObject($this->getBucket(), $path);
+        $config = $config ?? new Config();
+
+        return $this->getOssClient()->getObject(
+            $this->getBucket(),
+            ltrim($this->makePath($path, $config), '/'),
+            $config->get('options')
+        );
     }
 
     /**
      * @inheritDoc
      */
-    public function readStream(string $path)
+    public function readStream(string $path, Config $config = null)
     {
+        $config = $config ?? new Config();
+
+        $contents = $this->getOssClient()->getObject(
+            $this->getBucket(),
+            ltrim($this->makePath($path, $config), '/'),
+            $config->get('options')
+        );
+
         /** @var resource $stream */
         $stream = fopen('php://temp', 'w+b');
-        fwrite($stream, $this->read($path));
+        fwrite($stream, $contents);
         rewind($stream);
 
         return $stream;
@@ -146,15 +202,21 @@ class OssAdapter implements FilesystemAdapter
     /**
      * @inheritDoc
      */
-    public function delete(string $path): void
+    public function delete(string $path, Config $config = null): void
     {
-        $this->getOssClient()->deleteObject($this->getBucket(), $path);
+        $config = $config ?? new Config();
+
+        $this->getOssClient()->deleteObject(
+            $this->getBucket(),
+            ltrim($this->makePath($path, $config), '/'),
+            $config->get('options')
+        );
     }
 
     /**
      * @inheritDoc
      */
-    public function deleteDirectory(string $path): void
+    public function deleteDirectory(string $path, Config $config = null): void
     {
     }
 
@@ -164,7 +226,12 @@ class OssAdapter implements FilesystemAdapter
     public function createDirectory(string $path, Config $config = null): void
     {
         $config = $config ?? new Config();
-        $this->getOssClient()->createObjectDir($this->getBucket(), $path, $config->get('options'));
+
+        $this->getOssClient()->createObjectDir(
+            $this->getBucket(),
+            ltrim($this->makePath($path, $config), '/'),
+            $config->get('options')
+        );
     }
 
     /**
@@ -172,9 +239,16 @@ class OssAdapter implements FilesystemAdapter
      *
      * @throws OssException
      */
-    public function setVisibility(string $path, string $visibility): void
+    public function setVisibility(string $path, string $visibility, Config $config = null): void
     {
-        $this->getOssClient()->putObjectAcl($this->getBucket(), $path, Acl::toAcl($visibility));
+        $config = $config ?? new Config();
+
+        $this->getOssClient()->putObjectAcl(
+            $this->getBucket(),
+            ltrim($this->makePath($path, $config), '/'),
+            Acl::toAcl($visibility),
+            $config->get('options')
+        );
     }
 
     /**
@@ -182,42 +256,48 @@ class OssAdapter implements FilesystemAdapter
      *
      * @throws OssException
      */
-    public function visibility(string $path): FileAttributes
+    public function visibility(string $path, Config $config = null): FileAttributes
     {
-        $acl = $this->getOssClient()->getObjectAcl($this->getBucket(), $path);
+        $config = $config ?? new Config();
+
+        $acl = $this->getOssClient()->getObjectAcl(
+            $this->getBucket(),
+            ltrim($this->makePath($path, $config), '/'),
+            $config->get('options')
+        );
+
         $acl = 'default' === $acl ? $this->getDefaultAcl() : $acl;
-
         return new FileAttributes($path, null, Acl::toVisibility($acl));
     }
 
     /**
      * @inheritDoc
      */
-    public function mimeType(string $path): FileAttributes
+    public function mimeType(string $path, Config $config = null): FileAttributes
     {
-        return $this->getFileAttributes($path);
+        return $this->getFileAttributes($path, $config);
     }
 
     /**
      * @inheritDoc
      */
-    public function lastModified(string $path): FileAttributes
+    public function lastModified(string $path, Config $config = null): FileAttributes
     {
-        return $this->getFileAttributes($path);
+        return $this->getFileAttributes($path, $config);
     }
 
     /**
      * @inheritDoc
      */
-    public function fileSize(string $path): FileAttributes
+    public function fileSize(string $path, Config $config = null): FileAttributes
     {
-        return $this->getFileAttributes($path);
+        return $this->getFileAttributes($path, $config);
     }
 
     /**
      * @inheritDoc
      */
-    public function listContents(string $path, bool $deep): iterable
+    public function listContents(string $path, bool $deep, Config $config = null): iterable
     {
         throw new BadMethodCallException();
     }
@@ -230,11 +310,12 @@ class OssAdapter implements FilesystemAdapter
     public function copy(string $source, string $destination, Config $config = null): void
     {
         $config = $config ?? new Config();
+
         $this->getOssClient()->copyObject(
             $this->getBucket(),
-            $source,
+            ltrim($this->makePath($source, $config), '/'),
             $this->getBucket(),
-            $destination,
+            ltrim($this->makePath($destination, $config), '/'),
             $config->get('options')
         );
     }
@@ -247,13 +328,31 @@ class OssAdapter implements FilesystemAdapter
     public function move(string $source, string $destination, Config $config = null): void
     {
         $config = $config ?? new Config();
-        $this->copy($source, $destination, $config);
-        $this->delete($source);
+
+        $this->getOssClient()->copyObject(
+            $this->getBucket(),
+            ltrim($this->makePath($source, $config), '/'),
+            $this->getBucket(),
+            ltrim($this->makePath($destination, $config), '/'),
+            $config->get('options')
+        );
+
+        $this->getOssClient()->deleteObject(
+            $this->getBucket(),
+            ltrim($this->makePath($source, $config), '/'),
+            $config->get('options')
+        );
     }
 
-    public function getFileAttributes($path): FileAttributes
+    public function getFileAttributes($path, Config $config = null): FileAttributes
     {
-        $meta = $this->getOssClient()->getObjectMeta($this->getBucket(), $path);
+        $config = $config ?? new Config();
+
+        $meta = $this->getOssClient()->getObjectMeta(
+            $this->getBucket(),
+            ltrim($this->makePath($path, $config), '/'),
+            $config->get('options')
+        );
 
         return new FileAttributes(
             $path,
@@ -264,30 +363,6 @@ class OssAdapter implements FilesystemAdapter
         );
     }
 
-    public function cdnUrl($path): null|string
-    {
-        if (empty($this->getCdnBaseUrl())) {
-            return null;
-        }
-
-        $url = HUrl::parse($path);
-        if (!$url instanceof HUrl) {
-            return sprintf('%s/%s', rtrim($this->getCdnBaseUrl(), '/'), ltrim($path, '/'));
-        }
-
-        $baseUrl = HUrl::instance($this->getCdnBaseUrl());
-
-        return $url->withHost($baseUrl->getHost())->withScheme($baseUrl->getScheme())->toString();
-    }
-
-    /**
-     * @throws OssException
-     */
-    public function url($path): string
-    {
-        return HUrl::instance($this->authUrl($path))->withQueryArray([])->toString();
-    }
-
     /**
      * @throws OssException
      */
@@ -296,7 +371,7 @@ class OssAdapter implements FilesystemAdapter
         $config = $config ?? new Config();
 
         $url = HUrl::parse($path);
-        $path = $url instanceof HUrl ? $url->getPath() : $path;
+        $path = $url instanceof HUrl ? $url->getPath() : $this->makePath($path, $config);
 
         $signUrl = $this->getOssClient()->signUrl(
             $this->getBucket(),
@@ -316,20 +391,52 @@ class OssAdapter implements FilesystemAdapter
         return $url->toString();
     }
 
+    public function cdnUrl($path, Config $config = null): null|string
+    {
+        if (empty($this->getCdnBaseUrl())) {
+            return null;
+        }
+
+        if (!($url = HUrl::parse($path)) instanceof HUrl) {
+            return sprintf(
+                '%s/%s',
+                rtrim($this->getCdnBaseUrl(), '/'),
+                ltrim($this->makePath($path, $config), '/')
+            );
+        }
+
+        $baseUrl = HUrl::instance($this->getCdnBaseUrl());
+        return $url->withHost($baseUrl->getHost())->withScheme($baseUrl->getScheme())->toString();
+    }
+
+    /**
+     * @throws OssException
+     */
+    public function url($path, Config $config = null): string
+    {
+        $url = $this->authUrl($path, 60, OssClient::OSS_HTTP_GET, $config);
+
+        return HUrl::instance($url)->withQueryArray([])->toString();
+    }
+
     /**
      * @throws GuzzleException
-     * @throws FilesystemException
      */
     public function putUrl($url, $path, Config $config = null)
     {
         $config = $config ?? new Config();
         $response = $this->getHttpClient()->get($url, $config->get('http', []));
-        $this->write($path, $response->getBody()->getContents(), $config);
+
+        $this->getOssClient()->putObject(
+            $this->getBucket(),
+            ltrim($this->makePath($path, $config), '/'),
+            $response->getBody()->getContents(),
+            $config->get('options')
+        );
     }
 
     /**
      * @throws GuzzleException
-     * @throws FilesystemException
      * @throws OssException
      */
     public function putUrlAndReturnUrl($url, $path, Config $config = null): string
@@ -342,18 +449,20 @@ class OssAdapter implements FilesystemAdapter
     /**
      * 一般用于保存用户微信头像到DB的场景, 如果文件未发生变化不上传(仅通过url判断).
      *
-     * @param mixed  $cfile  需要上传的url
-     * @param mixed  $dfile  db的url
-     * @param string $prefix
-     *
-     * @throws FilesystemException
+     * @param  mixed  $cfile  需要上传的url
+     * @param  mixed  $dfile  db的url
+     * @param  string  $prefix
+     * @param  Config|null  $config
+     * @return string|null
      * @throws GuzzleException
      * @throws OssException
-     *
-     * @return string|null
      */
-    public function putUrlIfChangeUrl(mixed $cfile, mixed $dfile, string $prefix = ''): null|string
-    {
+    public function putUrlIfChangeUrl(
+        mixed $cfile,
+        mixed $dfile,
+        string $prefix = '',
+        Config $config = null
+    ): null|string {
         $cUrl = empty($cfile) ? null : Url::parse($cfile);
         $dUrl = empty($dfile) ? null : Url::parse($dfile);
 
@@ -369,43 +478,51 @@ class OssAdapter implements FilesystemAdapter
 
         $path = trim(sprintf('/%s/%s', trim($prefix, '/'), trim($cUrl->getPath(), '/')), '/');
 
-        return $this->putUrlAndReturnUrl($cfile, trim($path, '/'));
+        return $this->putUrlAndReturnUrl($cfile, $path, $config);
     }
 
-    /**
-     * @throws FilesystemException
-     */
     public function putFile($file, string $path, Config $config = null)
     {
         $config = $config ?? new Config();
-        $this->write($path, file_get_contents($file), $config);
+
+        $this->getOssClient()->putObject(
+            $this->getBucket(),
+            ltrim($this->makePath($path, $config), '/'),
+            file_get_contents($file),
+            $config->get('options')
+        );
     }
 
     /**
-     * @throws FilesystemException
      * @throws OssException
      */
     public function putFileAndReturnUrl($file, string $path, Config $config = null): string
     {
         $this->putFile($file, $path, $config);
 
-        return $this->cdnUrl($path) ?: $this->url($path);
+        return $this->cdnUrl($path, $config) ?: $this->url($path, $config);
     }
 
-    public function download($path, $file)
+    public function download($path, $file, Config $config = null)
     {
-        $this->getOssClient()->getObject($this->getBucket(), $path, [OssClient::OSS_FILE_DOWNLOAD => $file]);
+        $config = $config ?? new Config();
+
+        $this->getOssClient()->getObject(
+            $this->getBucket(),
+            ltrim($this->makePath($path, $config), '/'),
+            array_merge($config->get('options', []), [OssClient::OSS_FILE_DOWNLOAD => $file])
+        );
     }
 
     /**
      * Pass dynamic methods call onto oss.
      *
-     * @param string $method
-     * @param array  $parameters
-     *
-     * @throws BadMethodCallException
+     * @param  string  $method
+     * @param  array  $parameters
      *
      * @return mixed
+     * @throws BadMethodCallException
+     *
      */
     public function __call(string $method, array $parameters)
     {

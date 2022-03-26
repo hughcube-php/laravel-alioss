@@ -13,7 +13,6 @@ use HughCube\GuzzleHttp\HttpClientTrait;
 use HughCube\Laravel\AliOSS\Acl;
 use HughCube\Laravel\AliOSS\OssAdapter;
 use HughCube\PUrl\HUrl;
-use HughCube\PUrl\Url;
 use Illuminate\Support\Str;
 use League\Flysystem\Config;
 use League\Flysystem\FilesystemException;
@@ -27,6 +26,19 @@ use OSS\OssClient;
 class OssAdapterTest extends TestCase
 {
     use HttpClientTrait;
+
+    protected function makeOssKey($path, OssAdapter $adapter): string
+    {
+        $key = ltrim(sprintf(
+            '%s/%s',
+            trim($adapter->getPrefixer()->prefixPath(''), '/'),
+            ltrim($path, '/')
+        ), '/');
+
+        $this->assertSame($key, ltrim($adapter->makePath($path), '/'));
+
+        return $key;
+    }
 
     public function testGetOssClient()
     {
@@ -42,10 +54,11 @@ class OssAdapterTest extends TestCase
     {
         $this->caseWithClear(function (OssAdapter $adapter) {
             $content = Str::random();
-            $path = sprintf('oss-test/%s/%s.txt', md5(__METHOD__), Str::random(32));
+            $path = sprintf('/oss-test/%s/%s.txt', md5(__METHOD__), Str::random(32));
 
             $this->assertFalse($adapter->fileExists($path));
-            $adapter->getOssClient()->putObject($adapter->getBucket(), $path, $content);
+
+            $adapter->getOssClient()->putObject($adapter->getBucket(), $this->makeOssKey($path, $adapter), $content);
             $this->assertTrue($adapter->fileExists($path));
         });
     }
@@ -56,10 +69,10 @@ class OssAdapterTest extends TestCase
     public function testDirectoryExists()
     {
         $this->caseWithClear(function (OssAdapter $adapter) {
-            $path = sprintf('oss-test/%s/%s/', md5(__METHOD__), Str::random(32));
+            $path = sprintf('/oss-test/%s/%s/', md5(__METHOD__), Str::random(32));
 
             //$this->assertFalse($adapter->directoryExists($path));
-            $adapter->getOssClient()->createObjectDir($adapter->getBucket(), $path);
+            $adapter->getOssClient()->createObjectDir($adapter->getBucket(), $this->makeOssKey($path, $adapter));
             $this->assertTrue($adapter->directoryExists($path));
         });
     }
@@ -71,11 +84,13 @@ class OssAdapterTest extends TestCase
     {
         $this->caseWithClear(function (OssAdapter $adapter) {
             $content = Str::random();
-            $path = sprintf('oss-test/%s/%s.txt', md5(__METHOD__), Str::random(32));
+            $path = sprintf('/oss-test/%s/%s.txt', md5(__METHOD__), Str::random(32));
 
             $adapter->write($path, $content, new Config());
-
-            $this->assertSame($content, $adapter->getOssClient()->getObject($adapter->getBucket(), $path));
+            $this->assertSame(
+                $content,
+                $adapter->getOssClient()->getObject($adapter->getBucket(), $this->makeOssKey($path, $adapter))
+            );
         });
     }
 
@@ -93,7 +108,10 @@ class OssAdapterTest extends TestCase
             rewind($stream);
 
             $adapter->writeStream($path, $stream, new Config());
-            $this->assertSame($content, $adapter->getOssClient()->getObject($adapter->getBucket(), $path));
+            $this->assertSame(
+                $content,
+                $adapter->getOssClient()->getObject($adapter->getBucket(), $this->makeOssKey($path, $adapter))
+            );
 
             fclose($stream);
         });
@@ -111,7 +129,10 @@ class OssAdapterTest extends TestCase
             $path = sprintf('oss-test/%s/%s.txt', md5(__METHOD__), Str::random(32));
 
             $adapter->write($path, $content, new Config());
-            $this->assertSame($adapter->read($path), $content);
+            $this->assertSame(
+                $content,
+                $adapter->getOssClient()->getObject($adapter->getBucket(), $this->makeOssKey($path, $adapter))
+            );
         });
     }
 
@@ -124,7 +145,7 @@ class OssAdapterTest extends TestCase
             $content = Str::random();
             $path = sprintf('oss-test/%s/%s.txt', md5(__METHOD__), Str::random(32));
 
-            $adapter->write($path, $content, new Config());
+            $adapter->getOssClient()->putObject($adapter->getBucket(), $this->makeOssKey($path, $adapter), $content);
             $stream = $adapter->readStream($path);
 
             $this->assertTrue(is_resource($stream));
@@ -141,11 +162,13 @@ class OssAdapterTest extends TestCase
             $content = Str::random();
             $path = sprintf('oss-test/%s/%s.txt', md5(__METHOD__), Str::random(32));
 
-            $adapter->write($path, $content, new Config());
-            $this->assertTrue($adapter->fileExists($path));
+            $adapter->getOssClient()->putObject($adapter->getBucket(), $this->makeOssKey($path, $adapter), $content);
+            $this->assertTrue($adapter->getOssClient()
+                ->doesObjectExist($adapter->getBucket(), $this->makeOssKey($path, $adapter)));
 
             $adapter->delete($path);
-            $this->assertFalse($adapter->fileExists($path));
+            $this->assertFalse($adapter->getOssClient()
+                ->doesObjectExist($adapter->getBucket(), $this->makeOssKey($path, $adapter)));
         });
     }
 
@@ -185,13 +208,13 @@ class OssAdapterTest extends TestCase
             $content = Str::random();
             $path = sprintf('oss-test/%s/%s.txt', md5(__METHOD__), Str::random(32));
 
-            $adapter->write($path, $content, new Config());
-            $this->assertTrue($adapter->fileExists($path));
+            $key = $this->makeOssKey($path, $adapter);
+            $adapter->getOssClient()->putObject($adapter->getBucket(), $key, $content);
+            $this->assertTrue($adapter->getOssClient()->doesObjectExist($adapter->getBucket(), $key));
 
             foreach ([Visibility::PUBLIC, Visibility::PRIVATE] as $visibility) {
                 $adapter->setVisibility($path, $visibility);
-
-                $acl = $adapter->getOssClient()->getObjectAcl($adapter->getBucket(), $path);
+                $acl = $adapter->getOssClient()->getObjectAcl($adapter->getBucket(), $key);
                 $this->assertSame(Acl::toAcl($visibility), $acl);
             }
         });
@@ -207,8 +230,9 @@ class OssAdapterTest extends TestCase
             $content = Str::random();
             $path = sprintf('oss-test/%s/%s.txt', md5(__METHOD__), Str::random(32));
 
-            $adapter->write($path, $content, new Config());
-            $this->assertTrue($adapter->fileExists($path));
+            $key = $this->makeOssKey($path, $adapter);
+            $adapter->getOssClient()->putObject($adapter->getBucket(), $key, $content);
+            $this->assertTrue($adapter->getOssClient()->doesObjectExist($adapter->getBucket(), $key));
 
             foreach ([Visibility::PUBLIC, Visibility::PRIVATE] as $visibility) {
                 $adapter->setVisibility($path, $visibility);
@@ -228,8 +252,9 @@ class OssAdapterTest extends TestCase
             $content = Str::random();
             $path = sprintf('oss-test/%s/%s.txt', md5(__METHOD__), Str::random(32));
 
-            $adapter->write($path, $content, new Config());
-            $this->assertTrue($adapter->fileExists($path));
+            $key = $this->makeOssKey($path, $adapter);
+            $adapter->getOssClient()->putObject($adapter->getBucket(), $key, $content);
+            $this->assertTrue($adapter->getOssClient()->doesObjectExist($adapter->getBucket(), $key));
 
             $fileAttributes = $adapter->mimeType($path);
             $this->assertSame('text/plain', $fileAttributes->mimeType());
@@ -245,8 +270,9 @@ class OssAdapterTest extends TestCase
             $content = Str::random();
             $path = sprintf('oss-test/%s/%s.txt', md5(__METHOD__), Str::random(32));
 
-            $adapter->write($path, $content, new Config());
-            $this->assertTrue($adapter->fileExists($path));
+            $key = $this->makeOssKey($path, $adapter);
+            $adapter->getOssClient()->putObject($adapter->getBucket(), $key, $content);
+            $this->assertTrue($adapter->getOssClient()->doesObjectExist($adapter->getBucket(), $key));
 
             $fileAttributes = $adapter->lastModified($path);
             $this->assertIsInt($fileAttributes->lastModified());
@@ -262,8 +288,9 @@ class OssAdapterTest extends TestCase
             $content = Str::random();
             $path = sprintf('oss-test/%s/%s.txt', md5(__METHOD__), Str::random(32));
 
-            $adapter->write($path, $content, new Config());
-            $this->assertTrue($adapter->fileExists($path));
+            $key = $this->makeOssKey($path, $adapter);
+            $adapter->getOssClient()->putObject($adapter->getBucket(), $key, $content);
+            $this->assertTrue($adapter->getOssClient()->doesObjectExist($adapter->getBucket(), $key));
 
             $fileAttributes = $adapter->fileSize($path);
             $this->assertSame($fileAttributes->fileSize(), strlen($content));
@@ -272,7 +299,7 @@ class OssAdapterTest extends TestCase
 
     public function testListContents()
     {
-        $this->markTestSkipped();
+        $this->assertTrue(true);
     }
 
     /**
@@ -285,14 +312,17 @@ class OssAdapterTest extends TestCase
             $content = Str::random();
             $source = sprintf('oss-test/%s/%s.txt', md5(__METHOD__), Str::random(32));
 
-            $adapter->write($source, $content, new Config());
-            $this->assertTrue($adapter->fileExists($source));
+            $sourceKey = $this->makeOssKey($source, $adapter);
+            $adapter->getOssClient()->putObject($adapter->getBucket(), $sourceKey, $content);
+            $this->assertTrue($adapter->getOssClient()->doesObjectExist($adapter->getBucket(), $sourceKey));
 
             $destination = sprintf('oss-test/%s/move/%s.txt', md5(__METHOD__), Str::random(32));
             $adapter->move($source, $destination, new Config());
-            $this->assertTrue($adapter->fileExists($destination));
 
-            $this->assertFalse($adapter->fileExists($source));
+            $destinationKey = $this->makeOssKey($destination, $adapter);
+            $this->assertTrue($adapter->getOssClient()->doesObjectExist($adapter->getBucket(), $destinationKey));
+
+            $this->assertFalse($adapter->getOssClient()->doesObjectExist($adapter->getBucket(), $sourceKey));
         });
     }
 
@@ -306,12 +336,17 @@ class OssAdapterTest extends TestCase
             $content = Str::random();
             $source = sprintf('oss-test/%s/%s.txt', md5(__METHOD__), Str::random(32));
 
-            $adapter->write($source, $content, new Config());
-            $this->assertTrue($adapter->fileExists($source));
+            $sourceKey = $this->makeOssKey($source, $adapter);
+            $adapter->getOssClient()->putObject($adapter->getBucket(), $sourceKey, $content);
+            $this->assertTrue($adapter->getOssClient()->doesObjectExist($adapter->getBucket(), $sourceKey));
 
             $destination = sprintf('oss-test/%s/copy/%s.txt', md5(__METHOD__), Str::random(32));
             $adapter->copy($source, $destination, new Config());
-            $this->assertTrue($adapter->fileExists($destination));
+
+            $destinationKey = $this->makeOssKey($destination, $adapter);
+            $this->assertTrue($adapter->getOssClient()->doesObjectExist($adapter->getBucket(), $destinationKey));
+
+            $this->assertTrue($adapter->getOssClient()->doesObjectExist($adapter->getBucket(), $sourceKey));
         });
     }
 
@@ -323,14 +358,15 @@ class OssAdapterTest extends TestCase
         $this->caseWithClear(function (OssAdapter $adapter) {
             $path = sprintf('oss-test/%s/%s.txt', md5(__METHOD__), Str::random(32));
 
-            $url = $adapter->url($path);
-            $this->assertTrue(HUrl::isUrlString($url));
+            $url = HUrl::parse($adapter->url($path));
+
+            $this->assertInstanceOf(HUrl::class, $url);
+            $this->assertSame($url->getPath(), sprintf('/%s', $this->makeOssKey($path, $adapter)));
         });
     }
 
     /**
      * @throws OssException
-     * @throws FilesystemException
      * @throws GuzzleException
      */
     public function testAuthUrl()
@@ -339,15 +375,17 @@ class OssAdapterTest extends TestCase
             $content = Str::random();
             $path = sprintf('oss-test/%s/%s.txt', md5(__METHOD__), Str::random(32));
 
-            $adapter->write($path, $content, new Config());
-            $this->assertTrue($adapter->fileExists($path));
+            $key = $this->makeOssKey($path, $adapter);
+            $adapter->getOssClient()->putObject($adapter->getBucket(), $key, $content);
+            $this->assertTrue($adapter->getOssClient()->doesObjectExist($adapter->getBucket(), $key));
 
-            $url = $adapter->authUrl($path);
-            $this->assertTrue(HUrl::isUrlString($url));
+            $url = HUrl::parse($adapter->authUrl($path));
+            $this->assertInstanceOf(HUrl::class, $url);
+            $this->assertSame($url->getPath(), sprintf('/%s', $this->makeOssKey($path, $adapter)));
 
             $this->assertSame(
-                $this->getHttpClient()->get($url)->getBody()->getContents(),
-                $content
+                $content,
+                $this->getHttpClient()->get($url)->getBody()->getContents()
             );
         });
     }
@@ -362,8 +400,10 @@ class OssAdapterTest extends TestCase
         $this->caseWithClear(function (OssAdapter $adapter) {
             $content = Str::random();
             $source = sprintf('oss-test/%s/%s.txt', md5(__METHOD__), Str::random(32));
-            $adapter->write($source, $content, new Config());
-            $this->assertTrue($adapter->fileExists($source));
+
+            $key = $this->makeOssKey($source, $adapter);
+            $adapter->getOssClient()->putObject($adapter->getBucket(), $key, $content);
+            $this->assertTrue($adapter->getOssClient()->doesObjectExist($adapter->getBucket(), $key));
 
             $path = sprintf('oss-test/%s/%s.txt', md5(__METHOD__), Str::random(32));
             $adapter->putUrl($adapter->authUrl($source), $path);
@@ -372,9 +412,6 @@ class OssAdapterTest extends TestCase
         });
     }
 
-    /**
-     * @throws FilesystemException
-     */
     public function testPutFile()
     {
         $this->caseWithClear(function (OssAdapter $adapter) {
@@ -385,22 +422,21 @@ class OssAdapterTest extends TestCase
             $path = sprintf('oss-test/%s/%s.txt', md5(__METHOD__), Str::random(32));
             $adapter->putFile($file, $path);
 
-            $this->assertTrue($adapter->fileExists($path));
-            $this->assertSame($adapter->read($path), $content);
+            $key = $this->makeOssKey($path, $adapter);
+            $this->assertTrue($adapter->getOssClient()->doesObjectExist($adapter->getBucket(), $key));
+            $this->assertSame($adapter->getOssClient()->getObject($adapter->getBucket(), $key), $content);
         });
     }
 
-    /**
-     * @throws FilesystemException
-     */
     public function testDownload()
     {
         $this->caseWithClear(function (OssAdapter $adapter) {
             $content = Str::random();
             $path = sprintf('oss-test/%s/%s.txt', md5(__METHOD__), Str::random(32));
 
-            $adapter->write($path, $content, new Config());
-            $this->assertTrue($adapter->fileExists($path));
+            $key = $this->makeOssKey($path, $adapter);
+            $adapter->getOssClient()->putObject($adapter->getBucket(), $key, $content);
+            $this->assertTrue($adapter->getOssClient()->doesObjectExist($adapter->getBucket(), $key));
 
             $file = tempnam('/tmp', 'aliOssTest_');
             $adapter->download($path, $file);
@@ -420,8 +456,9 @@ class OssAdapterTest extends TestCase
             $content = Str::random();
             $path = sprintf('oss-test/%s/%s.txt', md5(__METHOD__), Str::random(32));
 
-            $adapter->write($path, $content, new Config());
-            $this->assertTrue($adapter->fileExists($path));
+            $key = $this->makeOssKey($path, $adapter);
+            $adapter->getOssClient()->putObject($adapter->getBucket(), $key, $content);
+            $this->assertTrue($adapter->getOssClient()->doesObjectExist($adapter->getBucket(), $key));
 
             /** 通过putUrl的方式上传 */
             $newPath = sprintf('oss-test/%s/1/%s.txt', md5(__METHOD__), Str::random(32));
@@ -434,7 +471,10 @@ class OssAdapterTest extends TestCase
             /** putUrlIfChangeUrl上传, 并且判断路径 */
             $prefix = sprintf('oss-test/%s/%s.txt', md5(__METHOD__), Str::random(32));
             $dUrl = $adapter->putUrlIfChangeUrl($adapter->authUrl($newUrl), null, $prefix);
-            $this->assertSame(Url::instance($dUrl)->getPath(), "/$prefix/$newPath");
+            $this->assertSame(
+                ltrim(HUrl::instance($dUrl)->getPath(), '/'),
+                $this->makeOssKey(sprintf("/$prefix/%s", $this->makeOssKey($newPath, $adapter)), $adapter)
+            );
             $this->assertSame(
                 $content,
                 $this->getHttpClient()->get($adapter->authUrl($dUrl))->getBody()->getContents()
@@ -449,8 +489,7 @@ class OssAdapterTest extends TestCase
             );
 
             /** putUrlIfChangeUrl上传, 并且判断路径, 并且无上传操作 */
-            $dUrl = $adapter->putUrlIfChangeUrl($adapter->authUrl($newUrl), null, $prefix);
-            $this->assertSame(Url::instance($dUrl)->getPath(), "/$prefix/$newPath");
+            $this->assertSame($dUrl, $adapter->putUrlIfChangeUrl($adapter->authUrl($newUrl), null, $prefix));
             $this->assertNotSame(
                 $content,
                 $this->getHttpClient()->get($adapter->authUrl($dUrl))->getBody()->getContents()

@@ -21,7 +21,7 @@ use Orchestra\Testbench\TestCase as OrchestraTestCase;
 class TestCase extends OrchestraTestCase
 {
     /**
-     * @param Application $app
+     * @param  Application  $app
      *
      * @return array
      */
@@ -34,7 +34,7 @@ class TestCase extends OrchestraTestCase
     }
 
     /**
-     * @param Application $app
+     * @param  Application  $app
      */
     protected function getEnvironmentSetUp($app)
     {
@@ -44,14 +44,17 @@ class TestCase extends OrchestraTestCase
         $config = $app['config'];
 
         $config->set('filesystems.disks.alioss', [
-            'driver'          => 'alioss',
-            'accessKeyId'     => env('ALIOSS_ACCESS_KEY_ID'),
+            'driver' => 'alioss',
+
+            'prefix' => '/oss-test/',
+
+            'accessKeyId' => env('ALIOSS_ACCESS_KEY_ID'),
             'accessKeySecret' => env('ALIOSS_ACCESS_KEY_SECRET'),
-            'endpoint'        => env('ALIOSS_ENDPOINT'),
-            'bucket'          => env('ALIOSS_BUCKET'),
-            'isCName'         => env('ALIOSS_IS_CNAME'),
-            'securityToken'   => env('ALIOSS_SECURITY_TOKEN'),
-            'requestProxy'    => env('ALIOSS_REQUEST_PROXY'),
+            'endpoint' => env('ALIOSS_ENDPOINT'),
+            'bucket' => env('ALIOSS_BUCKET'),
+            'isCName' => env('ALIOSS_IS_CNAME'),
+            'securityToken' => env('ALIOSS_SECURITY_TOKEN'),
+            'requestProxy' => env('ALIOSS_REQUEST_PROXY'),
         ]);
     }
 
@@ -77,7 +80,10 @@ class TestCase extends OrchestraTestCase
     public function caseWithClear(callable $callback)
     {
         $adapter = $this->getOssAdapter();
+
         $callback($adapter);
+
+        $callback($adapter->withConfig(['prefix' => null]));
 
         $options = ['delimiter' => '', 'prefix' => 'oss-test/', 'max-keys' => 1000, 'marker' => ''];
         $result = $adapter->getOssClient()->listObjects($adapter->getBucket(), $options);
