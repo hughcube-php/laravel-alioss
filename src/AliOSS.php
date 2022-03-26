@@ -18,16 +18,21 @@ use OSS\OssClient;
 use RuntimeException;
 
 /**
- * @method static null|string getBucket()
- * @method static null|string getCdnBaseUrl()
- * @method static null|string getDefaultAcl()
+ * @method static OssAdapter withConfig()
+ * @method static OssAdapter withBucket(string $bucket)
+ *
  * @method static PathPrefixer getPrefixer()
- * @method static null|string makePath(string $path, Config $config = null)
+ * @method static string getBucket()
+ * @method static null|string getCdnBaseUrl()
+ * @method static string makePath(string $path, Config $config = null)
+ * @method static string getDefaultAcl()
+ *
  * @method static bool fileExists(string $path, Config $config = null)
+ * @method static bool directoryExists(string $path, Config $config = null)
  * @method static void write(string $path, string $contents, Config $config = null)
- * @method static void writeStream(string $path, $contents, Config $config = null)
+ * @method static void writeStream(string $path, resource $contents, Config $config = null)
  * @method static string read(string $path, Config $config = null)
- * @method static string readStream(string $path, Config $config = null)
+ * @method static resource readStream(string $path, Config $config = null)
  * @method static void delete(string $path, Config $config = null)
  * @method static void deleteDirectory(string $path, Config $config = null)
  * @method static void createDirectory(string $path, Config $config = null)
