@@ -8,7 +8,7 @@ jobs:
     strategy:
       max-parallel: 15
       matrix:
-        operating-system: [ ubuntu-latest, windows-latest, macOS-latest ]
+        operating-system: [ ubuntu-latest, macOS-latest ]
         php-versions: [ '8.0', '8.1' ]
     name: PHP ${{ matrix.php-versions }} Test on ${{ matrix.operating-system }}
     steps:
