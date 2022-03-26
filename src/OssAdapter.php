@@ -36,11 +36,23 @@ class OssAdapter implements FilesystemAdapter
     private null|PathPrefixer $prefixer = null;
 
     /**
-     * @param array $config
+     * @param  array  $config
      */
     public function __construct(array $config)
     {
         $this->config = $config;
+    }
+
+    #[Pure]
+    public function forbidOverwriteConfig(): Config
+    {
+        return new Config([
+            'options' => [
+                OssClient::OSS_HEADERS => [
+                    'x-oss-forbid-overwrite' => 'true'
+                ],
+            ]
+        ]);
     }
 
     #[Pure]
@@ -451,15 +463,15 @@ class OssAdapter implements FilesystemAdapter
     /**
      * 一般用于保存用户微信头像到DB的场景, 如果文件未发生变化不上传(仅通过url判断).
      *
-     * @param mixed       $cfile  需要上传的url
-     * @param mixed       $dfile  db的url
-     * @param string      $prefix
-     * @param Config|null $config
-     *
-     * @throws GuzzleException
-     * @throws OssException
+     * @param  mixed  $cfile  需要上传的url
+     * @param  mixed  $dfile  db的url
+     * @param  string  $prefix
+     * @param  Config|null  $config
      *
      * @return string|null
+     * @throws OssException
+     *
+     * @throws GuzzleException
      */
     public function putUrlIfChangeUrl(
         mixed $cfile,
@@ -521,12 +533,12 @@ class OssAdapter implements FilesystemAdapter
     /**
      * Pass dynamic methods call onto oss.
      *
-     * @param string $method
-     * @param array  $parameters
-     *
-     * @throws BadMethodCallException
+     * @param  string  $method
+     * @param  array  $parameters
      *
      * @return mixed
+     * @throws BadMethodCallException
+     *
      */
     public function __call(string $method, array $parameters)
     {

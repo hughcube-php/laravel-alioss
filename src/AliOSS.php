@@ -18,6 +18,8 @@ use OSS\OssClient;
 use RuntimeException;
 
 /**
+ * @method static Config forbidOverwriteConfig()
+ *
  * @method static OssAdapter withConfig()
  * @method static OssAdapter withBucket(string $bucket)
  *
@@ -73,12 +75,12 @@ class AliOSS
     /**
      * Handle dynamic, static calls to the object.
      *
-     * @param string $method
-     * @param array  $args
-     *
-     * @throws RuntimeException
+     * @param  string  $method
+     * @param  array  $args
      *
      * @return mixed
+     * @throws RuntimeException
+     *
      */
     public static function __callStatic(string $method, array $args = [])
     {
