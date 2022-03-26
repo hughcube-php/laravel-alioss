@@ -19,16 +19,13 @@ use RuntimeException;
 
 /**
  * @method static Config forbidOverwriteConfig()
- *
  * @method static OssAdapter withConfig()
  * @method static OssAdapter withBucket(string $bucket)
- *
  * @method static PathPrefixer getPrefixer()
  * @method static string getBucket()
  * @method static null|string getCdnBaseUrl()
  * @method static string makePath(string $path, Config $config = null)
  * @method static string getDefaultAcl()
- *
  * @method static bool fileExists(string $path, Config $config = null)
  * @method static bool directoryExists(string $path, Config $config = null)
  * @method static void write(string $path, string $contents, Config $config = null)
@@ -75,12 +72,12 @@ class AliOSS
     /**
      * Handle dynamic, static calls to the object.
      *
-     * @param  string  $method
-     * @param  array  $args
+     * @param string $method
+     * @param array  $args
      *
-     * @return mixed
      * @throws RuntimeException
      *
+     * @return mixed
      */
     public static function __callStatic(string $method, array $args = [])
     {
