@@ -23,12 +23,11 @@ class Acl
     public static function getAclMap(): array
     {
         return [
-            OssClient::OSS_ACL_TYPE_PUBLIC_READ => Visibility::PUBLIC,
+            OssClient::OSS_ACL_TYPE_PUBLIC_READ       => Visibility::PUBLIC,
             OssClient::OSS_ACL_TYPE_PUBLIC_READ_WRITE => Visibility::PUBLIC,
-            OssClient::OSS_ACL_TYPE_PRIVATE => Visibility::PRIVATE,
+            OssClient::OSS_ACL_TYPE_PRIVATE           => Visibility::PRIVATE,
         ];
     }
-
 
     #[Pure]
     public static function toAcl($visibility): int|string

@@ -33,7 +33,7 @@ class OssAdapter implements FilesystemAdapter
     protected null|OssClient $ossClient = null;
 
     /**
-     * @param  array  $config
+     * @param array $config
      */
     public function __construct(array $config)
     {
@@ -276,6 +276,7 @@ class OssAdapter implements FilesystemAdapter
         }
 
         $baseUrl = HUrl::instance($this->getCdnBaseUrl());
+
         return $url->withHost($baseUrl->getHost())->withScheme($baseUrl->getScheme())->toString();
     }
 
@@ -334,19 +335,22 @@ class OssAdapter implements FilesystemAdapter
     public function putUrlAndReturnUrl($url, $path, Config $config = null): string
     {
         $this->putUrl($url, $path, $config);
+
         return $this->cdnUrl($path) ?: $this->url($path);
     }
 
     /**
-     * 一般用于保存用户微信头像到DB的场景, 如果文件未发生变化不上传(仅通过url判断)
+     * 一般用于保存用户微信头像到DB的场景, 如果文件未发生变化不上传(仅通过url判断).
      *
-     * @param  mixed  $cfile  需要上传的url
-     * @param  mixed  $dfile  db的url
-     * @param  string  $prefix
-     * @return string|null
+     * @param mixed  $cfile  需要上传的url
+     * @param mixed  $dfile  db的url
+     * @param string $prefix
+     *
      * @throws FilesystemException
      * @throws GuzzleException
      * @throws OssException
+     *
+     * @return string|null
      */
     public function putUrlIfChangeUrl(mixed $cfile, mixed $dfile, string $prefix = ''): null|string
     {
@@ -364,6 +368,7 @@ class OssAdapter implements FilesystemAdapter
         }
 
         $path = trim(sprintf('/%s/%s', trim($prefix, '/'), trim($cUrl->getPath(), '/')), '/');
+
         return $this->putUrlAndReturnUrl($cfile, trim($path, '/'));
     }
 
@@ -383,6 +388,7 @@ class OssAdapter implements FilesystemAdapter
     public function putFileAndReturnUrl($file, string $path, Config $config = null): string
     {
         $this->putFile($file, $path, $config);
+
         return $this->cdnUrl($path) ?: $this->url($path);
     }
 
@@ -394,12 +400,12 @@ class OssAdapter implements FilesystemAdapter
     /**
      * Pass dynamic methods call onto oss.
      *
-     * @param  string  $method
-     * @param  array  $parameters
+     * @param string $method
+     * @param array  $parameters
      *
-     * @return mixed
      * @throws BadMethodCallException
      *
+     * @return mixed
      */
     public function __call(string $method, array $parameters)
     {
