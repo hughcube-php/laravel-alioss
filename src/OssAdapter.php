@@ -12,6 +12,8 @@ use BadMethodCallException;
 use GuzzleHttp\Exception\GuzzleException;
 use HughCube\GuzzleHttp\HttpClientTrait;
 use HughCube\PUrl\HUrl;
+use HughCube\PUrl\Url;
+use Illuminate\Support\Str;
 use League\Flysystem\Config;
 use League\Flysystem\FileAttributes;
 use League\Flysystem\FilesystemAdapter;
@@ -26,18 +28,12 @@ class OssAdapter implements FilesystemAdapter
 {
     use HttpClientTrait;
 
-    /**
-     * @var array
-     */
-    protected $config;
+    protected array $config;
+
+    protected null|OssClient $ossClient = null;
 
     /**
-     * @var OssClient
-     */
-    protected $ossClient;
-
-    /**
-     * @param array $config
+     * @param  array  $config
      */
     public function __construct(array $config)
     {
@@ -71,7 +67,17 @@ class OssAdapter implements FilesystemAdapter
 
     public function getCdnBaseUrl()
     {
-        return $this->config['cdnBaseUrl'];
+        return ($this->config['cdnBaseUrl'] ?? null) ?: null;
+    }
+
+    public function getPrefix()
+    {
+        return ($this->config['prefix'] ?? null) ?: null;
+    }
+
+    public function makePath(string $path): string
+    {
+        return trim(sprintf('/%s/%s', trim($this->getPrefix()), ltrim($path)));
     }
 
     /**
@@ -101,16 +107,18 @@ class OssAdapter implements FilesystemAdapter
     /**
      * @inheritDoc
      */
-    public function write(string $path, string $contents, Config $config): void
+    public function write(string $path, string $contents, Config $config = null): void
     {
+        $config = $config ?? new Config();
         $this->getOssClient()->putObject($this->getBucket(), $path, $contents, $config->get('options'));
     }
 
     /**
      * @inheritDoc
      */
-    public function writeStream(string $path, $contents, Config $config): void
+    public function writeStream(string $path, $contents, Config $config = null): void
     {
+        $config = $config ?? new Config();
         $this->write($path, stream_get_contents($contents), $config);
     }
 
@@ -148,14 +156,14 @@ class OssAdapter implements FilesystemAdapter
      */
     public function deleteDirectory(string $path): void
     {
-
     }
 
     /**
      * @inheritDoc
      */
-    public function createDirectory(string $path, Config $config): void
+    public function createDirectory(string $path, Config $config = null): void
     {
+        $config = $config ?? new Config();
         $this->getOssClient()->createObjectDir($this->getBucket(), $path, $config->get('options'));
     }
 
@@ -219,8 +227,9 @@ class OssAdapter implements FilesystemAdapter
      *
      * @throws OssException
      */
-    public function copy(string $source, string $destination, Config $config): void
+    public function copy(string $source, string $destination, Config $config = null): void
     {
+        $config = $config ?? new Config();
         $this->getOssClient()->copyObject(
             $this->getBucket(),
             $source,
@@ -235,8 +244,9 @@ class OssAdapter implements FilesystemAdapter
      *
      * @throws OssException
      */
-    public function move(string $source, string $destination, Config $config): void
+    public function move(string $source, string $destination, Config $config = null): void
     {
+        $config = $config ?? new Config();
         $this->copy($source, $destination, $config);
         $this->delete($source);
     }
@@ -254,19 +264,19 @@ class OssAdapter implements FilesystemAdapter
         );
     }
 
-    public function cdnUrl($path): string
+    public function cdnUrl($path): null|string
     {
+        if (empty($this->getCdnBaseUrl())) {
+            return null;
+        }
+
         $url = HUrl::parse($path);
         if (!$url instanceof HUrl) {
             return sprintf('%s/%s', rtrim($this->getCdnBaseUrl(), '/'), ltrim($path, '/'));
         }
 
         $baseUrl = HUrl::instance($this->getCdnBaseUrl());
-
-        return $url
-            ->withHost($baseUrl->getHost())
-            ->withScheme($baseUrl->getScheme())
-            ->toString();
+        return $url->withHost($baseUrl->getHost())->withScheme($baseUrl->getScheme())->toString();
     }
 
     /**
@@ -289,7 +299,7 @@ class OssAdapter implements FilesystemAdapter
 
         $signUrl = $this->getOssClient()->signUrl(
             $this->getBucket(),
-            $path,
+            ltrim($path, '/'),
             $timeout,
             $method,
             $config->get('options')
@@ -313,8 +323,48 @@ class OssAdapter implements FilesystemAdapter
     {
         $config = $config ?? new Config();
         $response = $this->getHttpClient()->get($url, $config->get('http', []));
-
         $this->write($path, $response->getBody()->getContents(), $config);
+    }
+
+    /**
+     * @throws GuzzleException
+     * @throws FilesystemException
+     * @throws OssException
+     */
+    public function putUrlAndReturnUrl($url, $path, Config $config = null): string
+    {
+        $this->putUrl($url, $path, $config);
+        return $this->cdnUrl($path) ?: $this->url($path);
+    }
+
+    /**
+     * 一般用于保存用户微信头像到DB的场景, 如果文件未发生变化不上传(仅通过url判断)
+     *
+     * @param  mixed  $cfile  需要上传的url
+     * @param  mixed  $dfile  db的url
+     * @param  string  $prefix
+     * @return string|null
+     * @throws FilesystemException
+     * @throws GuzzleException
+     * @throws OssException
+     */
+    public function putUrlIfChangeUrl(mixed $cfile, mixed $dfile, string $prefix = ''): null|string
+    {
+        $cUrl = empty($cfile) ? null : Url::parse($cfile);
+        $dUrl = empty($dfile) ? null : Url::parse($dfile);
+
+        /** 需要上传的文件不存在(微信头像为空) */
+        if (!$cUrl instanceof Url) {
+            return $dfile instanceof Url ? $dfile->toString() : null;
+        }
+
+        /** db里面的文件路径包含需要上传的文件(微信头像为空), 说明已经上传了无需更改 */
+        if ($dUrl instanceof Url && Str::contains($dUrl->getPath(), $cUrl->getPath())) {
+            return $dfile->toString();
+        }
+
+        $path = trim(sprintf('/%s/%s', trim($prefix, '/'), trim($cUrl->getPath(), '/')), '/');
+        return $this->putUrlAndReturnUrl($cfile, trim($path, '/'));
     }
 
     /**
@@ -326,6 +376,16 @@ class OssAdapter implements FilesystemAdapter
         $this->write($path, file_get_contents($file), $config);
     }
 
+    /**
+     * @throws FilesystemException
+     * @throws OssException
+     */
+    public function putFileAndReturnUrl($file, string $path, Config $config = null): string
+    {
+        $this->putFile($file, $path, $config);
+        return $this->cdnUrl($path) ?: $this->url($path);
+    }
+
     public function download($path, $file)
     {
         $this->getOssClient()->getObject($this->getBucket(), $path, [OssClient::OSS_FILE_DOWNLOAD => $file]);
@@ -334,12 +394,12 @@ class OssAdapter implements FilesystemAdapter
     /**
      * Pass dynamic methods call onto oss.
      *
-     * @param string $method
-     * @param array  $parameters
-     *
-     * @throws BadMethodCallException
+     * @param  string  $method
+     * @param  array  $parameters
      *
      * @return mixed
+     * @throws BadMethodCallException
+     *
      */
     public function __call(string $method, array $parameters)
     {

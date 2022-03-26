@@ -21,7 +21,8 @@
         "laravel/lumen-framework": "*",
         "squizlabs/php_codesniffer": "*",
         "phpstan/phpstan": "*",
-        "orchestra/testbench": "*"
+        "orchestra/testbench": "*",
+        "jetbrains/phpstorm-attributes": "*"
     },
     "autoload": {
         "psr-4": {

@@ -36,10 +36,27 @@
 $ composer require hughcube/laravel-alioss -vvv
 ```
 
-## Configuration
+## Add a new disk to your `config/filesystems.php` config:
 
-```shell
-$ php artisan vendor:publish --provider="HughCube\Laravel\AliOSS\ServiceProvider"
+```php
+return [
+    'disks' => [
+        'alioss' => [
+            'driver'          => 'alioss',
+            'bucket'          => env('ALIOSS_BUCKET'),
+            'cdnBaseUrl'      => env('ALIOSS_CDN_BASE_URL'),
+            'prefix'          => env('ALIOSS_PREFIX'),
+            'acl'             => env('ALIOSS_ACL'),
+            
+            'accessKeyId'     => env('ALIOSS_ACCESS_KEY_ID'),
+            'accessKeySecret' => env('ALIOSS_ACCESS_KEY_SECRET'),
+            'endpoint'        => env('ALIOSS_ENDPOINT'),
+            'isCName'         => env('ALIOSS_IS_CNAME'),
+            'securityToken'   => env('ALIOSS_SECURITY_TOKEN'),
+            'requestProxy'    => env('ALIOSS_REQUEST_PROXY'),
+        ],
+    ]
+];
 ```
 
 ## Usage
