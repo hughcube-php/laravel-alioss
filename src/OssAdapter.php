@@ -479,12 +479,12 @@ class OssAdapter implements FilesystemAdapter
         string $prefix = '',
         Config $config = null
     ): null|string {
-        $cUrl = empty($cfile) ? null : Url::parse($cfile);
-        $dUrl = empty($dfile) ? null : Url::parse($dfile);
+        $cUrl = Url::parse($cfile);
+        $dUrl = Url::parse($dfile);
 
         /** 需要上传的文件不存在(微信头像为空) */
         if (!$cUrl instanceof Url) {
-            return $dfile instanceof Url ? $dfile->toString() : null;
+            return $dUrl instanceof Url ? $dUrl->toString() : null;
         }
 
         /** db里面的文件路径包含需要上传的文件(微信头像为空), 说明已经上传了无需更改 */
