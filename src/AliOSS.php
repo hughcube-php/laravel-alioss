@@ -48,7 +48,7 @@ use RuntimeException;
  * @method static string authUrl($path, $timeout = 60, $method = OssClient::OSS_HTTP_GET, Options $options = null)
  * @method static void putUrl($url, $path, Options $options = null)
  * @method static string putUrlAndReturnUrl($url, $path, Options $options = null)
- * @method static string|null putUrlIfChangeUrl(mixed $cfile, mixed $dfile, string $prefix = '', Options $options = null)
+ * @method static string|null putUrlIfChangeUrl($cfile, $dfile, string $prefix = '', Options $options = null)
  * @method static void putFile($file, string $path, Options $options = null)
  * @method static string putFileAndReturnUrl($file, string $path, Options $options = null)
  * @method static void download($path, $file, Options $options = null)
