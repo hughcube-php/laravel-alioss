@@ -18,6 +18,9 @@ use Illuminate\Filesystem\FilesystemManager;
 use Illuminate\Filesystem\FilesystemServiceProvider;
 use Illuminate\Foundation\Application;
 use Orchestra\Testbench\TestCase as OrchestraTestCase;
+use ReflectionClass;
+use ReflectionException;
+use ReflectionMethod;
 
 class TestCase extends OrchestraTestCase
 {
@@ -34,6 +37,61 @@ class TestCase extends OrchestraTestCase
             FilesystemServiceProvider::class,
             ServiceProvider::class,
         ];
+    }
+
+    /**
+     * @param object|string  $object $object
+     * @param string        $method
+     * @param array         $args
+     *
+     * @return mixed
+     *@throws ReflectionException
+     *
+     */
+    protected static function callMethod(object|string $object, string $method, array $args = []): mixed
+    {
+        $class = new ReflectionClass($object);
+
+        /** @var ReflectionMethod $method */
+        $method = $class->getMethod($method);
+        $method->setAccessible(true);
+
+        return $method->invokeArgs((is_object($object) ? $object : null), $args);
+    }
+
+    /**
+     * @param object $object $object
+     * @param string $name
+     *
+     * @throws ReflectionException
+     *
+     * @return mixed
+     */
+    protected static function getProperty(object $object, string $name): mixed
+    {
+        $class = new ReflectionClass($object);
+
+        $property = $class->getProperty($name);
+        $property->setAccessible(true);
+
+        return $property->getValue($object);
+    }
+
+    /**
+     * @param object $object
+     * @param string $name
+     * @param mixed  $value
+     *
+     * @throws ReflectionException
+     */
+    protected static function setProperty(object $object, string $name, mixed $value)
+    {
+        $class = new ReflectionClass($object);
+
+        $property = $class->getProperty($name);
+        $property->setAccessible(true);
+
+        $property->setValue($object, $value);
     }
 
     /**

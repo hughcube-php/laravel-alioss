@@ -11,7 +11,6 @@ namespace HughCube\Laravel\AliOSS\Action;
 
 use Exception;
 use HughCube\Laravel\AliOSS\AliOSS;
-use HughCube\Laravel\AliOSS\OssAdapter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -19,6 +18,8 @@ use Illuminate\Support\Str;
 use OSS\Core\OssException;
 use OSS\OssClient;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
+use Throwable;
 
 class UploadUrl
 {
@@ -30,24 +31,52 @@ class UploadUrl
      * @throws OssException
      * @throws Exception
      */
-    public function action(): JsonResponse
+    protected function action(): JsonResponse
     {
-        $oss = $this->getOss();
-        $path = $this->getPath();
+        $method = $this->getMethod() ?: OssClient::OSS_HTTP_PUT;
+        if (!is_string($method) || empty(trim($method))) {
+            throw new BadRequestHttpException('Method must be a non-empty string!');
+        }
 
-        $url = $oss->cdnUrl($path) ?: $oss->url($path);
+        $prefix = $this->getPrefix() ?: 'user';
+        if (!is_string($prefix) || empty(trim($prefix))) {
+            throw new BadRequestHttpException('Prefix must be a non-empty string!');
+        }
+
+        $suffix = $this->getSuffix() ?: null;
+        if (false === (is_null($suffix) || (is_string($suffix) && !empty(trim($suffix))))) {
+            throw new BadRequestHttpException('The suffix either does not pass, or it must be a non-empty string!');
+        }
+
+        $timeout = $this->getTimeout() ?? 60;
+        if (!is_numeric($timeout) && empty($timeout)) {
+            throw new BadRequestHttpException('Timeout must be a number greater than 0!');
+        }
+
+        $client = $this->getClient() ?: null;
+        if (!is_null($client) && !is_string($client)) {
+            throw new BadRequestHttpException('The client either does not pass, or it must be a non-empty string!');
+        }
+
+        try {
+            $oss = AliOSS::getClient($client);
+        } catch (Throwable) {
+            throw new BadRequestHttpException('The client is not recognized!');
+        }
 
         $options = $oss->forbidOverwriteOptions();
-        $method = OssClient::OSS_HTTP_PUT;
-        $action = $oss->authUploadUrl($path, ($this->getTimeout() ?: 60), OssClient::OSS_HTTP_PUT, $options);
+        $path = $this->getPath($prefix, $suffix);
+
+        $url = $oss->cdnUrl($path) ?: $oss->url($path);
+        $action = $oss->authUploadUrl($path, $timeout, $method, $options);
 
         return new JsonResponse([
-            'code'    => 200,
+            'code' => 200,
             'message' => 'ok',
-            'data'    => [
-                'url'     => $url,
-                'action'  => $action,
-                'method'  => $method,
+            'data' => [
+                'url' => $url,
+                'action' => $action,
+                'method' => $method,
                 'headers' => [
                     'x-oss-forbid-overwrite' => 'true',
                 ],
@@ -58,41 +87,48 @@ class UploadUrl
     /**
      * @throws Exception
      */
-    protected function getPath(): string
+    protected function getPath(string $prefix, null|string $suffix): string
     {
+
+
         $path = sprintf(
             '%s/%s%s%s/%s%s%s/%s',
-            $this->getPrefix(),
+            trim($prefix, '/'),
             $this->hash([microtime(), Str::random()]),
             $this->hash([$_SERVER, $this->request->all(), $this->request->getContent()]),
             $this->hash([random_int(PHP_INT_MIN, PHP_INT_MAX), Str::random(), random_bytes(100)]),
             $this->hash([random_int(PHP_INT_MIN, PHP_INT_MAX), Str::random(), random_bytes(100)]),
             $this->hash([random_int(PHP_INT_MIN, PHP_INT_MAX), Str::random(), random_bytes(100)]),
             $this->hash([Auth::id(), Str::random(), Str::random()]),
-            $this->getPrefix()
+            trim($suffix, '/')
         );
 
         return trim($path, '/');
     }
 
-    protected function getPrefix(): null|string
+    protected function getMethod(): mixed
     {
-        return $this->request->get('prefix') ?: null;
+        return $this->request->get('method');
     }
 
-    protected function getSuffix(): null|string
+    protected function getPrefix(): mixed
     {
-        return $this->request->get('suffix') ?: null;
+        return $this->request->get('prefix');
     }
 
-    protected function getTimeout(): int|null
+    protected function getSuffix(): mixed
     {
-        return $this->request->get('timeout') ?: null;
+        return $this->request->get('suffix');
     }
 
-    protected function getOss(): OssAdapter
+    protected function getTimeout(): mixed
     {
-        return AliOSS::getClient($this->request->get('oss'));
+        return $this->request->get('timeout');
+    }
+
+    protected function getClient(): mixed
+    {
+        return $this->request->get('client');
     }
 
     protected function hash(mixed $data): string
@@ -101,9 +137,9 @@ class UploadUrl
     }
 
     /**
+     * @return Response
      * @throws OssException
      *
-     * @return Response
      */
     public function __invoke(): Response
     {
