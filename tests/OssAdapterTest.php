@@ -489,8 +489,8 @@ class OssAdapterTest extends TestCase
             );
 
             /** putUrlIfChangeUrl上传, 并且判断路径, 并且无上传操作 */
-            $this->assertSame($dUrl, $adapter->putUrlIfChangeUrl($adapter->authUrl($newUrl), null, $prefix));
-            $this->assertNotSame(
+            $this->assertSame($dUrl, $adapter->putUrlIfChangeUrl($adapter->authUrl($newUrl), $dUrl, $prefix));
+            $this->assertSame(
                 $content,
                 $this->getHttpClient()->get($adapter->authUrl($dUrl))->getBody()->getContents()
             );

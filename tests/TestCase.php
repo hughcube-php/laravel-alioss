@@ -83,6 +83,8 @@ class TestCase extends OrchestraTestCase
 
         $callback($adapter);
 
+        $callback($adapter->withBucket($adapter->getBucket()));
+
         $callback($adapter->withConfig(['prefix' => null]));
 
         $options = ['delimiter' => '', 'prefix' => 'oss-test/', 'max-keys' => 1000, 'marker' => ''];
