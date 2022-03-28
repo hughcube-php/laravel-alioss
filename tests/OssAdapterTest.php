@@ -25,8 +25,6 @@ use OSS\OssClient;
  */
 class OssAdapterTest extends TestCase
 {
-    use HttpClientTrait;
-
     protected function makeOssKey($path, OssAdapter $adapter): string
     {
         $key = ltrim(sprintf(

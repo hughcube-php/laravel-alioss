@@ -9,6 +9,7 @@
 namespace HughCube\Laravel\AliOSS\Tests;
 
 use BadMethodCallException;
+use HughCube\GuzzleHttp\HttpClientTrait;
 use HughCube\Laravel\AliOSS\OssAdapter;
 use HughCube\Laravel\AliOSS\ServiceProvider;
 use Illuminate\Config\Repository;
@@ -20,6 +21,8 @@ use Orchestra\Testbench\TestCase as OrchestraTestCase;
 
 class TestCase extends OrchestraTestCase
 {
+    use HttpClientTrait;
+
     /**
      * @param Application $app
      *
