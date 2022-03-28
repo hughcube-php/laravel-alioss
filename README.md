@@ -44,6 +44,7 @@ return [
         'alioss' => [
             'driver'          => 'alioss',
             'bucket'          => env('ALIOSS_BUCKET'),
+            'uploadBaseUrl'   => env('ALIOSS_UPLOAD_BASE_URL'),
             'cdnBaseUrl'      => env('ALIOSS_CDN_BASE_URL'),
             'prefix'          => env('ALIOSS_PREFIX'),
             'acl'             => env('ALIOSS_ACL'),
