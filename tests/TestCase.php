@@ -40,13 +40,13 @@ class TestCase extends OrchestraTestCase
     }
 
     /**
-     * @param object|string  $object $object
+     * @param object|string $object $object
      * @param string        $method
      * @param array         $args
      *
-     * @return mixed
      *@throws ReflectionException
      *
+     * @return mixed
      */
     protected static function callMethod(object|string $object, string $method, array $args = []): mixed
     {

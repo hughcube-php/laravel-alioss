@@ -14,7 +14,6 @@ use HughCube\Laravel\AliOSS\AliOSS;
 use HughCube\PUrl\HUrl;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use League\Flysystem\FilesystemException;
 use OSS\Core\OssException;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
@@ -49,18 +48,19 @@ class Meta
 
         $meta = null;
         $ossException = null;
+
         try {
             $meta = $oss->getObjectMeta($oss->getBucket(), ltrim($url->getPath(), '/'));
         } catch (OssException $ossException) {
         }
 
         return new JsonResponse([
-            'code' => 200,
+            'code'    => 200,
             'message' => 'ok',
-            'data' => [
-                'status' => $ossException instanceof OssException ? $ossException->getHTTPStatus() : 200,
+            'data'    => [
+                'status'   => $ossException instanceof OssException ? $ossException->getHTTPStatus() : 200,
                 'mimetype' => $meta['content-type'] ?? null,
-                'size' => isset($meta['content-length']) ? intval($meta['content-length']) : null,
+                'size'     => isset($meta['content-length']) ? intval($meta['content-length']) : null,
             ],
         ]);
     }
@@ -81,9 +81,9 @@ class Meta
     }
 
     /**
-     * @return Response
      * @throws OssException
      *
+     * @return Response
      */
     public function __invoke(): Response
     {

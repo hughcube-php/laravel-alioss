@@ -71,12 +71,12 @@ class UploadUrl
         $action = $oss->authUploadUrl($path, $timeout, $method, $options);
 
         return new JsonResponse([
-            'code' => 200,
+            'code'    => 200,
             'message' => 'ok',
-            'data' => [
-                'url' => $url,
-                'action' => $action,
-                'method' => $method,
+            'data'    => [
+                'url'     => $url,
+                'action'  => $action,
+                'method'  => $method,
                 'headers' => [
                     'x-oss-forbid-overwrite' => 'true',
                 ],
@@ -95,7 +95,6 @@ class UploadUrl
             $this->hash([$_SERVER, $this->request->all(), $this->request->getContent()]),
             $this->hash(microtime()),
             $this->hash([random_int(PHP_INT_MIN, PHP_INT_MAX), Str::random(), random_bytes(100)]),
-
             $this->hash([random_int(PHP_INT_MIN, PHP_INT_MAX), Str::random(), random_bytes(100)]),
             $this->hash([Auth::id(), Str::random(), Str::random()]),
             $this->hash([random_int(PHP_INT_MIN, PHP_INT_MAX), Str::random(), random_bytes(100)]),
@@ -136,9 +135,9 @@ class UploadUrl
     }
 
     /**
-     * @return Response
      * @throws OssException
      *
+     * @return Response
      */
     public function __invoke(): Response
     {
