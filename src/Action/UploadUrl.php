@@ -89,17 +89,16 @@ class UploadUrl
      */
     protected function getPath(string $prefix, null|string $suffix): string
     {
-
-
         $path = sprintf(
             '%s/%s%s%s/%s%s%s/%s',
             trim($prefix, '/'),
-            $this->hash([microtime(), Str::random()]),
             $this->hash([$_SERVER, $this->request->all(), $this->request->getContent()]),
+            $this->hash(microtime()),
             $this->hash([random_int(PHP_INT_MIN, PHP_INT_MAX), Str::random(), random_bytes(100)]),
-            $this->hash([random_int(PHP_INT_MIN, PHP_INT_MAX), Str::random(), random_bytes(100)]),
+
             $this->hash([random_int(PHP_INT_MIN, PHP_INT_MAX), Str::random(), random_bytes(100)]),
             $this->hash([Auth::id(), Str::random(), Str::random()]),
+            $this->hash([random_int(PHP_INT_MIN, PHP_INT_MAX), Str::random(), random_bytes(100)]),
             trim($suffix, '/')
         );
 
@@ -133,7 +132,7 @@ class UploadUrl
 
     protected function hash(mixed $data): string
     {
-        return base_convert(abs(crc32(serialize($data))), 10, 36);
+        return base_convert(abs(crc32((is_scalar($data) ? $data : serialize($data)))), 10, 36);
     }
 
     /**
