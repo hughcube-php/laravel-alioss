@@ -4,7 +4,7 @@
  * Created by PhpStorm.
  * User: hugh.li
  * Date: 2021/4/15
- * Time: 8:42 下午
+ * Time: 8:42 下午.
  */
 
 namespace HughCube\Laravel\AliOSS\Action;
@@ -42,16 +42,16 @@ class UploadUrl
         $action = $oss->authUploadUrl($path, ($this->getTimeout() ?: 60), OssClient::OSS_HTTP_PUT, $options);
 
         return new JsonResponse([
-            'code' => 200,
+            'code'    => 200,
             'message' => 'ok',
-            'data' => [
-                'url' => $url,
-                'action' => $action,
-                'method' => $method,
+            'data'    => [
+                'url'     => $url,
+                'action'  => $action,
+                'method'  => $method,
                 'headers' => [
                     'x-oss-forbid-overwrite' => 'true',
                 ],
-            ]
+            ],
         ]);
     }
 
@@ -101,8 +101,9 @@ class UploadUrl
     }
 
     /**
-     * @return Response
      * @throws OssException
+     *
+     * @return Response
      */
     public function __invoke(): Response
     {

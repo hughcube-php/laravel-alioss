@@ -9,7 +9,6 @@
 namespace HughCube\Laravel\AliOSS\Tests;
 
 use GuzzleHttp\Exception\GuzzleException;
-use HughCube\GuzzleHttp\HttpClientTrait;
 use HughCube\Laravel\AliOSS\Acl;
 use HughCube\Laravel\AliOSS\OssAdapter;
 use HughCube\PUrl\HUrl;
