@@ -97,7 +97,7 @@ class UploadUrl
 
     protected function hash(mixed $data): string
     {
-        return base_convert(abs(crc32(serialize($data))), 10, 32);
+        return base_convert(abs(crc32(serialize($data))), 10, 36);
     }
 
     /**
