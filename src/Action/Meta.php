@@ -76,10 +76,10 @@ class Meta
     }
 
     /**
-     * @return Response
      * @throws Exception
-     *
      * @throws OssException
+     *
+     * @return Response
      */
     public function __invoke(): Response
     {
