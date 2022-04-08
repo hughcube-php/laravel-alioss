@@ -10,24 +10,6 @@
     <a href="https://styleci.io/repos/473234744">
         <img src="https://github.styleci.io/repos/473234744/shield?branch=master" alt="StyleCI">
     </a>
-    <a href="https://github.com/hughcube-php/laravel-alioss">
-        <img src="https://img.shields.io/badge/php-%3E%3D%207.0-8892BF.svg" alt="PHP Versions Supported">
-    </a>
-    <a href="https://packagist.org/packages/hughcube/laravel-alioss">
-        <img src="https://poser.pugx.org/hughcube-php/laravel-alioss/version" alt="Latest Stable Version">
-    </a>
-    <a href="https://packagist.org/packages/hughcube/laravel-alioss">
-        <img src="https://poser.pugx.org/hughcube-php/laravel-alioss/downloads" alt="Total Downloads">
-    </a>
-    <a href="https://github.com/hughcube-php/laravel-alioss/blob/master/LICENSE">
-        <img src="https://img.shields.io/badge/license-MIT-428f7e.svg" alt="License">
-    </a>
-    <a href="https://packagist.org/packages/hughcube/laravel-alioss">
-        <img src="https://poser.pugx.org/hughcube-php/laravel-alioss/v/unstable" alt="Latest Unstable Version">
-    </a>
-    <a href="https://packagist.org/packages/hughcube/laravel-alioss">
-        <img src="https://poser.pugx.org/hughcube-php/laravel-alioss/composerlock" alt="composer.lock available">
-    </a>
 </p>
 
 ## Installing

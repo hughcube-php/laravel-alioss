@@ -75,15 +75,11 @@ class Meta
         return $this->request->get('client');
     }
 
-    protected function hash(mixed $data): string
-    {
-        return base_convert(abs(crc32(serialize($data))), 10, 36);
-    }
-
     /**
-     * @throws OssException
-     *
      * @return Response
+     * @throws Exception
+     *
+     * @throws OssException
      */
     public function __invoke(): Response
     {
