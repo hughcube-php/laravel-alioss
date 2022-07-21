@@ -107,7 +107,7 @@ class TestCase extends OrchestraTestCase
         $config->set('filesystems.disks.alioss', [
             'driver' => 'alioss',
 
-            'prefix' => '/oss-test/',
+            'prefix' => '/s/oss/test/',
 
             'accessKeyId'     => env('ALIOSS_ACCESS_KEY_ID'),
             'accessKeySecret' => env('ALIOSS_ACCESS_KEY_SECRET'),

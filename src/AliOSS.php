@@ -59,7 +59,7 @@ class AliOSS
 {
     public static function getClient(null|string $name = null): OssAdapter
     {
-        $disk = Storage::disk($name ?: 'alioss');
+        $disk = Storage::disk($name ?: 'oss');
 
         $adapter = $disk instanceof FilesystemAdapter ? $disk->getAdapter() : null;
         if (!$adapter instanceof OssAdapter) {
