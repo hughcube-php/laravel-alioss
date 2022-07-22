@@ -104,7 +104,7 @@ class TestCase extends OrchestraTestCase
         /** @var Repository $config */
         $config = $app['config'];
 
-        $config->set('filesystems.disks.alioss', [
+        $config->set('filesystems.disks.oss', [
             'driver' => 'alioss',
 
             'prefix' => '/s/oss/test/',
@@ -123,7 +123,7 @@ class TestCase extends OrchestraTestCase
     {
         /** @var FilesystemManager $manager */
         $manager = $this->app['filesystem'];
-        $disk = $manager->disk('alioss');
+        $disk = $manager->disk('oss');
 
         /** @var OssAdapter $adapter */
         $adapter = $disk instanceof FilesystemAdapter ? $disk->getAdapter() : null;
