@@ -11,6 +11,7 @@ namespace HughCube\Laravel\AliOSS\Action;
 
 use Exception;
 use HughCube\Laravel\AliOSS\AliOSS;
+use HughCube\PUrl\HUrl;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -75,7 +76,7 @@ class UploadUrl
             'message' => 'ok',
             'data' => [
                 'url' => $url,
-                'key' => $path,
+                'path' => HUrl::parse($url)?->getPath(),
                 'action' => $action,
                 'method' => $method,
                 'headers' => [
