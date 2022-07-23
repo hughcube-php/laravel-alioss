@@ -71,12 +71,15 @@ class UploadUrl
         $url = $oss->cdnUrl($path) ?: $oss->url($path);
         $action = $oss->authUploadUrl($path, $timeout, $method, $options);
 
+        $key = ltrim((HUrl::parse($url)?->getPath() ?: ''), '/') ?: null;
+
         return new JsonResponse([
             'code' => 200,
             'message' => 'ok',
             'data' => [
                 'url' => $url,
-                'path' => HUrl::parse($url)?->getPath(),
+                'key' => $key,
+                'path' => $key ? "/$key" : null,
                 'action' => $action,
                 'method' => $method,
                 'headers' => [
