@@ -447,7 +447,6 @@ class OssAdapter implements FilesystemAdapter
         $method = OssClient::OSS_HTTP_PUT,
         Options $config = null
     ): string {
-
         if (HUrl::isUrlString($path)) {
             $url = $path;
         } else {
