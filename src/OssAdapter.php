@@ -447,7 +447,16 @@ class OssAdapter implements FilesystemAdapter
         $method = OssClient::OSS_HTTP_PUT,
         Options $config = null
     ): string {
-        $url = sprintf('%s/%s', rtrim(($this->getUploadBaseUrl() ?: ''), '/'), ltrim($path, '/'));
+
+        if (HUrl::isUrlString($path)) {
+            $url = $path;
+        } else {
+            $url = sprintf(
+                '%s/%s',
+                rtrim(($this->getUploadBaseUrl() ?: ''), '/'),
+                ltrim($this->makePath($path, $config), '/')
+            );
+        }
 
         return $this->authUrl(ltrim($url, '/'), $timeout, $method, $config);
     }
