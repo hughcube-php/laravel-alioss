@@ -74,14 +74,14 @@ class UploadUrl
         $key = ltrim((HUrl::parse($url)?->getPath() ?: ''), '/') ?: null;
 
         return new JsonResponse([
-            'code' => 200,
+            'code'    => 200,
             'message' => 'ok',
-            'data' => [
-                'url' => $url,
-                'key' => $key,
-                'path' => $key ? "/$key" : null,
-                'action' => $action,
-                'method' => $method,
+            'data'    => [
+                'url'     => $url,
+                'key'     => $key,
+                'path'    => $key ? "/$key" : null,
+                'action'  => $action,
+                'method'  => $method,
                 'headers' => [
                     'x-oss-forbid-overwrite' => 'true',
                 ],
@@ -140,9 +140,9 @@ class UploadUrl
     }
 
     /**
-     * @return Response
      * @throws OssException
      *
+     * @return Response
      */
     public function __invoke(): Response
     {
