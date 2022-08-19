@@ -102,6 +102,16 @@ class OssAdapter implements FilesystemAdapter
         return $this->config['bucket'];
     }
 
+    public function getAccessKeyId()
+    {
+        return $this->config['accessKeyId'];
+    }
+
+    public function getAccessKeySecret()
+    {
+        return $this->config['accessKeySecret'];
+    }
+
     public function getCdnBaseUrl()
     {
         return ($this->config['cdnBaseUrl'] ?? null) ?: null;
