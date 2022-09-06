@@ -36,7 +36,7 @@ class OssAdapter implements FilesystemAdapter
     private null|PathPrefixer $prefixer = null;
 
     /**
-     * @param array $config
+     * @param  array  $config
      */
     public function __construct(array $config)
     {
@@ -120,6 +120,19 @@ class OssAdapter implements FilesystemAdapter
     public function getUploadBaseUrl()
     {
         return ($this->config['uploadBaseUrl'] ?? null) ?: null;
+    }
+
+    public function getRegionId()
+    {
+        return ($this->config['regionId'] ?? null) ?: null;
+    }
+
+    public function getOssOriginalDomain($internal = false): string
+    {
+        if ($internal) {
+            return sprintf('%s.oss-%s-internal.aliyuncs.com', $this->getBucket(), $this->getRegionId());
+        }
+        return sprintf('%s.oss-%s.aliyuncs.com', $this->getBucket(), $this->getRegionId());
     }
 
     public function makePath(string $path, Options $config = null): string
@@ -500,15 +513,15 @@ class OssAdapter implements FilesystemAdapter
     /**
      * 一般用于保存用户微信头像到DB的场景, 如果文件未发生变化不上传(仅通过url判断).
      *
-     * @param mixed        $cfile  需要上传的url
-     * @param mixed        $dfile  db的url
-     * @param string       $prefix
-     * @param Options|null $config
-     *
-     * @throws GuzzleException
-     * @throws OssException
+     * @param  mixed  $cfile  需要上传的url
+     * @param  mixed  $dfile  db的url
+     * @param  string  $prefix
+     * @param  Options|null  $config
      *
      * @return string|null
+     * @throws OssException
+     *
+     * @throws GuzzleException
      */
     public function putUrlIfChangeUrl(
         mixed $cfile,
@@ -570,12 +583,12 @@ class OssAdapter implements FilesystemAdapter
     /**
      * Pass dynamic methods call onto oss.
      *
-     * @param string $method
-     * @param array  $parameters
-     *
-     * @throws BadMethodCallException
+     * @param  string  $method
+     * @param  array  $parameters
      *
      * @return mixed
+     * @throws BadMethodCallException
+     *
      */
     public function __call(string $method, array $parameters)
     {
