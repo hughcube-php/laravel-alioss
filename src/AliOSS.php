@@ -52,6 +52,7 @@ use RuntimeException;
  * @method static void putFile($file, string $path, Options $options = null)
  * @method static string putFileAndReturnUrl($file, string $path, Options $options = null)
  * @method static void download($path, $file, Options $options = null)
+ * @method static void createSymlink($symlink, $target, Options $config = null)
  *
  * @see OssAdapter
  */
