@@ -11,78 +11,68 @@ namespace HughCube\Laravel\AliOSS\Action;
 
 use Exception;
 use HughCube\Laravel\AliOSS\AliOSS;
-use HughCube\PUrl\HUrl;
+use HughCube\Laravel\AliOSS\OssAdapter;
+use HughCube\PUrl\Url;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use OSS\Core\OssException;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Throwable;
 
-class Meta
+trait Meta
 {
-    public function __construct(protected Request $request)
-    {
-    }
-
     /**
      * @throws Exception
      */
     protected function action(): JsonResponse
     {
-        $url = HUrl::parse($this->getUrl());
-        if (!$url instanceof HUrl) {
-            throw new BadRequestHttpException('Url must be a correct URL string!');
-        }
-
-        $client = $this->getClient() ?: null;
-        if (!is_null($client) && !is_string($client)) {
-            throw new BadRequestHttpException('The client either does not pass, or it must be a non-empty string!');
-        }
-
-        try {
-            $oss = AliOSS::getClient($client);
-        } catch (Throwable) {
-            throw new BadRequestHttpException('The client is not recognized!');
-        }
+        $url = $this->getUrl();
+        $client = $this->getClient();
 
         $meta = null;
         $ossException = null;
 
         try {
-            $meta = $oss->getObjectMeta($oss->getBucket(), ltrim($url->getPath(), '/'));
+            $meta = $client->getObjectMeta($client->getBucket(), ltrim($url->getPath(), '/'));
         } catch (OssException $ossException) {
         }
 
         return new JsonResponse([
-            'code'    => 200,
+            'code' => 200,
             'message' => 'ok',
-            'data'    => [
-                'status'   => $ossException instanceof OssException ? $ossException->getHTTPStatus() : 200,
+            'data' => [
                 'mimetype' => $meta['content-type'] ?? null,
-                'size'     => isset($meta['content-length']) ? intval($meta['content-length']) : null,
+                'size' => isset($meta['content-length']) ? intval($meta['content-length']) : null,
+                'status' => $ossException instanceof OssException ? $ossException->getHTTPStatus() : 200,
             ],
         ]);
     }
 
-    protected function getUrl(): mixed
+    protected function getUrl(): Url
     {
-        return $this->request->input('url');
+        $uri = $this->getRequest()->input('url');
+
+        $url = Url::parse($uri);
+        if (!$url instanceof Url) {
+            throw new BadRequestHttpException('Url must be a correct URL string!');
+        }
+
+        return $url;
     }
 
-    protected function getClient(): mixed
+    protected function getClient(): OssAdapter
     {
-        return $this->request->get('client');
+        $name = $this->getRequest()->get('client');
+
+        if (!is_null($name) && !is_string($name)) {
+            throw new BadRequestHttpException('The client either does not pass, or it must be a non-empty string!');
+        }
+
+        try {
+            return AliOSS::getClient($name);
+        } catch (Throwable) {
+            throw new BadRequestHttpException('The client is not recognized!');
+        }
     }
 
-    /**
-     * @throws Exception
-     * @throws OssException
-     *
-     * @return Response
-     */
-    public function __invoke(): Response
-    {
-        return $this->action();
-    }
+    abstract protected function getRequest();
 }

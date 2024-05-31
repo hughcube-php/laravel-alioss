@@ -596,6 +596,37 @@ class OssAdapter implements FilesystemAdapter
         );
     }
 
+    public function isBucketUrl($url): bool
+    {
+        $url = Url::parse($url);
+        foreach ([
+                $this->getCdnBaseUrl(),
+                $this->getOssOriginalDomain(),
+                $this->getOssOriginalDomain(true)
+            ] as $domain
+        ) {
+            if ($url instanceof Url
+                && ($url->getHost() === $domain || $url->getHost() === HUrl::parse($domain)?->getHost())
+            ) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public function hasUrl($url): bool
+    {
+        try {
+            $this->getObjectMeta($this->getBucket(), ltrim(HUrl::parse($url)?->getPath(), '/'));
+            return true;
+        } catch (\OSS\Core\OssException $exception) {
+            if (404 != $exception->getHTTPStatus()) {
+                throw  $exception;
+            }
+        }
+        return false;
+    }
+
     /**
      * Pass dynamic methods call onto oss.
      *
