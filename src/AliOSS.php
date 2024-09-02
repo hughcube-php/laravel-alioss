@@ -70,6 +70,11 @@ class AliOSS
         return $adapter;
     }
 
+    public static function base64EncodeWatermarkText($text): string
+    {
+        return OssAdapter::base64EncodeWatermarkText($text);
+    }
+
     /**
      * Handle dynamic, static calls to the object.
      *

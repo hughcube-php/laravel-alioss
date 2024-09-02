@@ -627,6 +627,11 @@ class OssAdapter implements FilesystemAdapter
         return false;
     }
 
+    public static function base64EncodeWatermarkText($text): string
+    {
+        return rtrim(strtr(base64_encode($text), ['+' => '-', '/' => '_']));
+    }
+
     /**
      * Pass dynamic methods call onto oss.
      *
