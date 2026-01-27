@@ -1,36 +1,45 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: hugh.li
- * Date: 2021/4/20
- * Time: 11:36 下午.
- */
 
 namespace HughCube\Laravel\AliOSS\Tests;
 
 use BadMethodCallException;
-use HughCube\GuzzleHttp\HttpClientTrait;
+use Dotenv\Dotenv;
 use HughCube\Laravel\AliOSS\OssAdapter;
 use HughCube\Laravel\AliOSS\ServiceProvider;
-use Illuminate\Config\Repository;
 use Illuminate\Filesystem\FilesystemAdapter;
-use Illuminate\Filesystem\FilesystemManager;
 use Illuminate\Filesystem\FilesystemServiceProvider;
-use Illuminate\Foundation\Application;
+use Illuminate\Support\Facades\Storage;
+use League\Flysystem\Filesystem;
 use Orchestra\Testbench\TestCase as OrchestraTestCase;
-use ReflectionClass;
-use ReflectionException;
-use ReflectionMethod;
 
-class TestCase extends OrchestraTestCase
+abstract class TestCase extends OrchestraTestCase
 {
-    use HttpClientTrait;
+    protected function setUp(): void
+    {
+        $this->loadEnv();
+        $this->configureSsl();
+        parent::setUp();
+    }
 
-    /**
-     * @param Application $app
-     *
-     * @return array
-     */
+    protected function loadEnv(): void
+    {
+        $envFile = dirname(__DIR__) . '/.env';
+        if (file_exists($envFile)) {
+            $dotenv = Dotenv::createImmutable(dirname(__DIR__));
+            $dotenv->safeLoad();
+        }
+    }
+
+    protected function configureSsl(): void
+    {
+        // 配置 SSL 证书路径，解决 Windows 环境下的 SSL 证书问题
+        $caFile = __DIR__ . '/cacert.pem';
+        if (file_exists($caFile)) {
+            ini_set('curl.cainfo', $caFile);
+            ini_set('openssl.cafile', $caFile);
+        }
+    }
+
     protected function getPackageProviders($app): array
     {
         return [
@@ -39,93 +48,26 @@ class TestCase extends OrchestraTestCase
         ];
     }
 
-    /**
-     * @param object|string $object $object
-     * @param string        $method
-     * @param array         $args
-     *
-     *@throws ReflectionException
-     *
-     * @return mixed
-     */
-    protected static function callMethod(object|string $object, string $method, array $args = []): mixed
+    protected function defineEnvironment($app): void
     {
-        $class = new ReflectionClass($object);
-
-        /** @var ReflectionMethod $method */
-        $method = $class->getMethod($method);
-        $method->setAccessible(true);
-
-        return $method->invokeArgs((is_object($object) ? $object : null), $args);
-    }
-
-    /**
-     * @param object $object $object
-     * @param string $name
-     *
-     * @throws ReflectionException
-     *
-     * @return mixed
-     */
-    protected static function getProperty(object $object, string $name): mixed
-    {
-        $class = new ReflectionClass($object);
-
-        $property = $class->getProperty($name);
-        $property->setAccessible(true);
-
-        return $property->getValue($object);
-    }
-
-    /**
-     * @param object $object
-     * @param string $name
-     * @param mixed  $value
-     *
-     * @throws ReflectionException
-     */
-    protected static function setProperty(object $object, string $name, mixed $value)
-    {
-        $class = new ReflectionClass($object);
-
-        $property = $class->getProperty($name);
-        $property->setAccessible(true);
-
-        $property->setValue($object, $value);
-    }
-
-    /**
-     * @param Application $app
-     */
-    protected function getEnvironmentSetUp($app)
-    {
-        parent::getEnvironmentSetUp($app);
-
-        /** @var Repository $config */
-        $config = $app['config'];
-
-        $config->set('filesystems.disks.oss', [
+        $app['config']->set('filesystems.disks.oss', [
             'driver' => 'alioss',
-
-            'prefix' => '/s/oss/test/',
-
-            'accessKeyId'     => env('ALIOSS_ACCESS_KEY_ID'),
-            'accessKeySecret' => env('ALIOSS_ACCESS_KEY_SECRET'),
-            'endpoint'        => env('ALIOSS_ENDPOINT'),
-            'bucket'          => env('ALIOSS_BUCKET'),
-            'isCName'         => env('ALIOSS_IS_CNAME'),
-            'securityToken'   => env('ALIOSS_SECURITY_TOKEN'),
-            'requestProxy'    => env('ALIOSS_REQUEST_PROXY'),
+            'accessKeyId' => env('ALIOSS_ACCESS_KEY_ID', 'test-access-key-id'),
+            'accessKeySecret' => env('ALIOSS_ACCESS_KEY_SECRET', 'test-access-key-secret'),
+            'endpoint' => env('ALIOSS_ENDPOINT', 'oss-cn-hangzhou.aliyuncs.com'),
+            'bucket' => env('ALIOSS_BUCKET', 'test-bucket'),
+            'regionId' => env('ALIOSS_REGION_ID', 'cn-hangzhou'),
+            'isCName' => env('ALIOSS_IS_CNAME', false),
+            'prefix' => env('ALIOSS_PREFIX', ''),
+            'cdnBaseUrl' => env('ALIOSS_CDN_BASE_URL', 'https://cdn.example.com'),
+            'uploadBaseUrl' => env('ALIOSS_UPLOAD_BASE_URL', 'https://upload.example.com'),
         ]);
     }
 
     protected function getOssAdapter(): OssAdapter
     {
-        /** @var FilesystemManager $manager */
-        $manager = $this->app['filesystem'];
-        $disk = $manager->disk('oss');
+        $disk = Storage::disk('oss');
 
-        /** @var OssAdapter $adapter */
         $adapter = $disk instanceof FilesystemAdapter ? $disk->getAdapter() : null;
         if (!$adapter instanceof OssAdapter) {
             throw new BadMethodCallException('Can only be called to alioss drives!');
@@ -134,35 +76,29 @@ class TestCase extends OrchestraTestCase
         return $adapter;
     }
 
-    /**
-     * @throws
-     * @phpstan-ignore-next-line
-     */
-    public function caseWithClear(callable $callback)
+    protected function createMockAdapter(array $config = []): OssAdapter
     {
-        $adapter = $this->getOssAdapter();
+        $defaultConfig = [
+            'accessKeyId' => env('ALIOSS_ACCESS_KEY_ID', 'test-access-key-id'),
+            'accessKeySecret' => env('ALIOSS_ACCESS_KEY_SECRET', 'test-access-key-secret'),
+            'endpoint' => env('ALIOSS_ENDPOINT', 'oss-cn-hangzhou.aliyuncs.com'),
+            'bucket' => env('ALIOSS_BUCKET', 'test-bucket'),
+            'regionId' => env('ALIOSS_REGION_ID', 'cn-hangzhou'),
+            'isCName' => env('ALIOSS_IS_CNAME', false),
+            'prefix' => '',
+            'cdnBaseUrl' => env('ALIOSS_CDN_BASE_URL', 'https://cdn.example.com'),
+            'uploadBaseUrl' => env('ALIOSS_UPLOAD_BASE_URL', 'https://upload.example.com'),
+        ];
 
-        $callback($adapter);
+        return new OssAdapter(array_merge($defaultConfig, $config));
+    }
 
-        $callback($adapter->withBucket($adapter->getBucket()));
+    protected function setupMockOssDisk(?OssAdapter $adapter = null): void
+    {
+        $adapter = $adapter ?? $this->createMockAdapter();
 
-        $callback($adapter->withConfig(['prefix' => null]));
-
-        $options = ['delimiter' => '', 'prefix' => 'oss-test/', 'max-keys' => 1000, 'marker' => ''];
-        $result = $adapter->getOssClient()->listObjects($adapter->getBucket(), $options);
-
-        $objects = [];
-        foreach ($result->getObjectList() as $object) {
-            if (in_array($object->getKey(), ['oss-test/', 'oss-test'])) {
-                continue;
-            }
-
-            $objects[] = $object->getKey();
-        }
-        if (empty($objects)) {
-            return;
-        }
-
-        $adapter->deleteObjects($adapter->getBucket(), $objects);
+        Storage::extend('alioss', function ($app, $config) use ($adapter) {
+            return new FilesystemAdapter(new Filesystem($adapter), $adapter, $config);
+        });
     }
 }

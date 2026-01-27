@@ -1,40 +1,66 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: hugh.li
- * Date: 2021/4/20
- * Time: 11:36 下午.
- */
 
 namespace HughCube\Laravel\AliOSS\Tests;
 
-use Exception;
+use BadMethodCallException;
 use HughCube\Laravel\AliOSS\AliOSS;
 use HughCube\Laravel\AliOSS\OssAdapter;
-use Illuminate\Support\Str;
 
-/**
- * @group authCase
- */
 class AliOSSTest extends TestCase
 {
-    /**
-     * @throws Exception
-     */
-    public function testAssert()
+    public function testGetClient(): void
     {
-        $this->assertInstanceOf(OssAdapter::class, AliOSS::getClient());
+        $adapter = AliOSS::getClient('oss');
+        $this->assertInstanceOf(OssAdapter::class, $adapter);
     }
 
-    public function testFileExists()
+    public function testGetClientWithDefaultDisk(): void
     {
-        $this->caseWithClear(function (OssAdapter $adapter) {
-            $content = Str::random();
-            $path = sprintf('oss-test/%s/%s.txt', md5(__METHOD__), Str::random(32));
+        $adapter = AliOSS::getClient();
+        $this->assertInstanceOf(OssAdapter::class, $adapter);
+    }
 
-            $this->assertFalse(AliOSS::fileExists($path));
-            AliOSS::write($path, $content);
-            $this->assertTrue(AliOSS::fileExists($path));
-        });
+    public function testGetClientThrowsExceptionForNonOssDisk(): void
+    {
+        $this->app['config']->set('filesystems.disks.local', [
+            'driver' => 'local',
+            'root' => storage_path('app'),
+        ]);
+
+        $this->expectException(BadMethodCallException::class);
+        AliOSS::getClient('local');
+    }
+
+    public function testBase64EncodeWatermarkText(): void
+    {
+        $text = 'Hello World';
+        $encoded = AliOSS::base64EncodeWatermarkText($text);
+
+        $this->assertStringNotContainsString('+', $encoded);
+        $this->assertStringNotContainsString('/', $encoded);
+
+        $decoded = base64_decode(strtr($encoded, ['-' => '+', '_' => '/']));
+        $this->assertSame($text, $decoded);
+    }
+
+    public function testStaticCallForwarding(): void
+    {
+        $bucket = AliOSS::getBucket();
+        $this->assertNotEmpty($bucket);
+
+        $prefixer = AliOSS::getPrefixer();
+        $this->assertNotNull($prefixer);
+    }
+
+    public function testIsBucketUrlViaFacade(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $cdnBaseUrl = $adapter->getCdnBaseUrl();
+
+        if ($cdnBaseUrl) {
+            $this->assertTrue(AliOSS::isBucketUrl($cdnBaseUrl . '/test.jpg'));
+        }
+
+        $this->assertFalse(AliOSS::isBucketUrl('https://other.example.com/file.jpg'));
     }
 }

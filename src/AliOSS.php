@@ -24,6 +24,7 @@ use RuntimeException;
  * @method static PathPrefixer getPrefixer()
  * @method static string getBucket()
  * @method static null|string getCdnBaseUrl()
+ * @method static null|string getUploadBaseUrl()
  * @method static string makePath(string $path, Options $options = null)
  * @method static string getDefaultAcl()
  * @method static bool fileExists(string $path, Options $options = null)
@@ -53,6 +54,9 @@ use RuntimeException;
  * @method static string putFileAndReturnUrl($file, string $path, Options $options = null)
  * @method static void download($path, $file, Options $options = null)
  * @method static void createSymlink($symlink, $target, Options $config = null)
+ * @method static bool isBucketUrl($url)
+ * @method static bool hasUrl($url) @deprecated 使用 isValidUrl($url, false, true) 代替
+ * @method static bool isValidUrl($url, bool $checkBucketDomain = true, bool $checkFileExists = true)
  *
  * @see OssAdapter
  */

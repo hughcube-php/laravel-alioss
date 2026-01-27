@@ -14,7 +14,6 @@ use HughCube\GuzzleHttp\HttpClientTrait;
 use HughCube\PUrl\HUrl;
 use HughCube\PUrl\Url;
 use Illuminate\Support\Str;
-use JetBrains\PhpStorm\Pure;
 use League\Flysystem\Config as Options;
 use League\Flysystem\FileAttributes;
 use League\Flysystem\FilesystemAdapter;
@@ -43,7 +42,6 @@ class OssAdapter implements FilesystemAdapter
         $this->config = $config;
     }
 
-    #[Pure]
     public function forbidOverwriteOptions(): Options
     {
         return new Options([
@@ -55,14 +53,12 @@ class OssAdapter implements FilesystemAdapter
         ]);
     }
 
-    #[Pure]
     public function withConfig(array $config = []): static
     {
         /** @phpstan-ignore-next-line */
         return new static(array_merge($this->config, $config));
     }
 
-    #[Pure]
     public function withBucket(string $bucket): static
     {
         return $this->withConfig(['bucket' => $bucket]);
@@ -91,7 +87,7 @@ class OssAdapter implements FilesystemAdapter
     public function getPrefixer(): PathPrefixer
     {
         if (!$this->prefixer instanceof PathPrefixer) {
-            $this->prefixer = new PathPrefixer((($this->config['prefix'] ?? '') ?: ''), DIRECTORY_SEPARATOR);
+            $this->prefixer = new PathPrefixer((($this->config['prefix'] ?? '') ?: ''), '/');
         }
 
         return $this->prefixer;
@@ -271,6 +267,7 @@ class OssAdapter implements FilesystemAdapter
      */
     public function deleteDirectory(string $path, Options $config = null): void
     {
+        throw new BadMethodCallException();
     }
 
     /**
@@ -326,6 +323,7 @@ class OssAdapter implements FilesystemAdapter
 
     /**
      * @inheritDoc
+     * @deprecated 使用 getFileAttributes() 代替
      */
     public function mimeType(string $path, Options $config = null): FileAttributes
     {
@@ -334,6 +332,7 @@ class OssAdapter implements FilesystemAdapter
 
     /**
      * @inheritDoc
+     * @deprecated 使用 getFileAttributes() 代替
      */
     public function lastModified(string $path, Options $config = null): FileAttributes
     {
@@ -342,6 +341,7 @@ class OssAdapter implements FilesystemAdapter
 
     /**
      * @inheritDoc
+     * @deprecated 使用 getFileAttributes() 代替
      */
     public function fileSize(string $path, Options $config = null): FileAttributes
     {
@@ -366,10 +366,8 @@ class OssAdapter implements FilesystemAdapter
         $config = $config ?? new Options();
 
         $this->getOssClient()->copyObject(
-            $this->getBucket(),
-            ltrim($this->makePath($source, $config), '/'),
-            $this->getBucket(),
-            ltrim($this->makePath($destination, $config), '/'),
+            $this->getBucket(), ltrim($this->makePath($source, $config), '/'),
+            $this->getBucket(), ltrim($this->makePath($destination, $config), '/'),
             $config->get('options')
         );
     }
@@ -384,16 +382,13 @@ class OssAdapter implements FilesystemAdapter
         $config = $config ?? new Options();
 
         $this->getOssClient()->copyObject(
-            $this->getBucket(),
-            ltrim($this->makePath($source, $config), '/'),
-            $this->getBucket(),
-            ltrim($this->makePath($destination, $config), '/'),
+            $this->getBucket(), ltrim($this->makePath($source, $config), '/'),
+            $this->getBucket(), ltrim($this->makePath($destination, $config), '/'),
             $config->get('options')
         );
 
         $this->getOssClient()->deleteObject(
-            $this->getBucket(),
-            ltrim($this->makePath($source, $config), '/'),
+            $this->getBucket(), ltrim($this->makePath($source, $config), '/'),
             $config->get('options')
         );
     }
@@ -403,17 +398,16 @@ class OssAdapter implements FilesystemAdapter
         $config = $config ?? new Options();
 
         $meta = $this->getOssClient()->getObjectMeta(
-            $this->getBucket(),
-            ltrim($this->makePath($path, $config), '/'),
+            $this->getBucket(), ltrim($this->makePath($path, $config), '/'),
             $config->get('options')
         );
 
         return new FileAttributes(
             $path,
-            $meta['content-length'],
+            $meta['content-length'] ?? null,
             null,
-            $meta['info']['filetime'],
-            $meta['content-type']
+            $meta['info']['filetime'] ?? null,
+            $meta['content-type'] ?? null
         );
     }
 
@@ -428,11 +422,8 @@ class OssAdapter implements FilesystemAdapter
         $path = $url instanceof HUrl ? $url->getPath() : $this->makePath($path, $config);
 
         $signUrl = $this->getOssClient()->signUrl(
-            $this->getBucket(),
-            ltrim($path, '/'),
-            $timeout,
-            $method,
-            $config->get('options')
+            $this->getBucket(), ltrim($path, '/'),
+            $timeout, $method, $config->get('options')
         );
         if (!$url instanceof HUrl) {
             return $signUrl;
@@ -611,32 +602,71 @@ class OssAdapter implements FilesystemAdapter
     public function isBucketUrl($url): bool
     {
         $url = Url::parse($url);
-        foreach ([
-                     $this->getCdnBaseUrl(),
-                     $this->getOssOriginalDomain(),
-                     $this->getOssOriginalDomain(true)
-                 ] as $domain
-        ) {
-            if ($url instanceof Url
-                && ($url->getHost() === $domain || $url->getHost() === HUrl::parse($domain)?->getHost())
-            ) {
+        if (!$url instanceof Url) {
+            return false;
+        }
+
+        $domains = array_filter([
+            $this->getCdnBaseUrl(),
+            $this->getUploadBaseUrl(),
+            $this->getOssOriginalDomain(),
+            $this->getOssOriginalDomain(true),
+        ]);
+
+        foreach ($domains as $domain) {
+            $domainHost = HUrl::parse($domain)?->getHost() ?: $domain;
+            if ($url->getHost() === $domainHost) {
                 return true;
             }
         }
+
         return false;
     }
 
+    /**
+     * @deprecated 使用 isValidUrl($url, false, true) 代替
+     */
     public function hasUrl($url): bool
     {
-        try {
-            $this->getObjectMeta($this->getBucket(), ltrim(HUrl::parse($url)?->getPath(), '/'));
-            return true;
-        } catch (\OSS\Core\OssException $exception) {
-            if (404 != $exception->getHTTPStatus()) {
-                throw  $exception;
+        return $this->isValidUrl($url, false, true);
+    }
+
+    /**
+     * 验证 URL 是否是有效的 OSS 文件地址
+     *
+     * @param mixed $url 要验证的 URL
+     * @param bool $checkBucketDomain 是否检查域名归属
+     * @param bool $checkFileExists 是否检查文件存在
+     * @return bool
+     */
+    public function isValidUrl($url, bool $checkBucketDomain = true, bool $checkFileExists = true): bool
+    {
+        if (!HUrl::isUrlString($url)) {
+            return false;
+        }
+
+        if ($checkBucketDomain && !$this->isBucketUrl($url)) {
+            return false;
+        }
+
+        if ($checkFileExists) {
+            $path = ltrim(HUrl::parse($url)?->getPath() ?? '', '/');
+            if (empty($path)) {
+                return false;
+            }
+
+            try {
+                $this->getObjectMeta($this->getBucket(), $path);
+            } catch (OssException $exception) {
+                // 404 表示文件不存在
+                if ((int) $exception->getHTTPStatus() === 404) {
+                    return false;
+                }
+                throw $exception;
             }
         }
-        return false;
+
+        return true;
     }
 
     public static function base64EncodeWatermarkText($text): string
