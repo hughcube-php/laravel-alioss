@@ -512,4 +512,814 @@ class OssUrlExistsTest extends TestCase
         // 清理
         $adapter->delete($path);
     }
+
+    // ==================== 文档类型快捷方法测试 ====================
+
+    public function testWordMimeType(): void
+    {
+        $rule = OssUrlExists::make()->word();
+
+        $reflection = new \ReflectionClass($rule);
+        $property = $reflection->getProperty('allowedMimeTypes');
+        $property->setAccessible(true);
+
+        $mimeTypes = $property->getValue($rule);
+
+        $this->assertContains('application/msword', $mimeTypes);
+        $this->assertContains('application/vnd.openxmlformats-officedocument.wordprocessingml.document', $mimeTypes);
+        $this->assertCount(2, $mimeTypes);
+    }
+
+    public function testPptMimeType(): void
+    {
+        $rule = OssUrlExists::make()->ppt();
+
+        $reflection = new \ReflectionClass($rule);
+        $property = $reflection->getProperty('allowedMimeTypes');
+        $property->setAccessible(true);
+
+        $mimeTypes = $property->getValue($rule);
+
+        $this->assertContains('application/vnd.ms-powerpoint', $mimeTypes);
+        $this->assertContains('application/vnd.openxmlformats-officedocument.presentationml.presentation', $mimeTypes);
+        $this->assertCount(2, $mimeTypes);
+    }
+
+    public function testExcelMimeType(): void
+    {
+        $rule = OssUrlExists::make()->excel();
+
+        $reflection = new \ReflectionClass($rule);
+        $property = $reflection->getProperty('allowedMimeTypes');
+        $property->setAccessible(true);
+
+        $mimeTypes = $property->getValue($rule);
+
+        $this->assertContains('application/vnd.ms-excel', $mimeTypes);
+        $this->assertContains('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', $mimeTypes);
+        $this->assertCount(2, $mimeTypes);
+    }
+
+    public function testPdfMimeType(): void
+    {
+        $rule = OssUrlExists::make()->pdf();
+
+        $reflection = new \ReflectionClass($rule);
+        $property = $reflection->getProperty('allowedMimeTypes');
+        $property->setAccessible(true);
+
+        $mimeTypes = $property->getValue($rule);
+
+        $this->assertContains('application/pdf', $mimeTypes);
+        $this->assertCount(1, $mimeTypes);
+    }
+
+    public function testDocumentMimeType(): void
+    {
+        $rule = OssUrlExists::make()->document();
+
+        $reflection = new \ReflectionClass($rule);
+        $property = $reflection->getProperty('allowedMimeTypes');
+        $property->setAccessible(true);
+
+        $mimeTypes = $property->getValue($rule);
+
+        $this->assertContains('application/pdf', $mimeTypes);
+        $this->assertContains('application/msword', $mimeTypes);
+        $this->assertContains('application/vnd.openxmlformats-officedocument.wordprocessingml.document', $mimeTypes);
+        $this->assertContains('application/vnd.ms-excel', $mimeTypes);
+        $this->assertContains('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', $mimeTypes);
+        $this->assertContains('application/vnd.ms-powerpoint', $mimeTypes);
+        $this->assertContains('application/vnd.openxmlformats-officedocument.presentationml.presentation', $mimeTypes);
+        $this->assertContains('text/plain', $mimeTypes);
+        $this->assertContains('application/rtf', $mimeTypes);
+    }
+
+    public function testArchiveMimeType(): void
+    {
+        $rule = OssUrlExists::make()->archive();
+
+        $reflection = new \ReflectionClass($rule);
+        $property = $reflection->getProperty('allowedMimeTypes');
+        $property->setAccessible(true);
+
+        $mimeTypes = $property->getValue($rule);
+
+        $this->assertContains('application/zip', $mimeTypes);
+        $this->assertContains('application/x-rar-compressed', $mimeTypes);
+        $this->assertContains('application/vnd.rar', $mimeTypes);
+        $this->assertContains('application/x-7z-compressed', $mimeTypes);
+        $this->assertContains('application/gzip', $mimeTypes);
+        $this->assertContains('application/x-tar', $mimeTypes);
+        $this->assertContains('application/x-bzip2', $mimeTypes);
+    }
+
+    public function testTextMimeType(): void
+    {
+        $rule = OssUrlExists::make()->text();
+
+        $reflection = new \ReflectionClass($rule);
+        $property = $reflection->getProperty('allowedMimeTypes');
+        $property->setAccessible(true);
+
+        $mimeTypes = $property->getValue($rule);
+
+        $this->assertContains('text/*', $mimeTypes);
+    }
+
+    public function testJsonMimeType(): void
+    {
+        $rule = OssUrlExists::make()->json();
+
+        $reflection = new \ReflectionClass($rule);
+        $property = $reflection->getProperty('allowedMimeTypes');
+        $property->setAccessible(true);
+
+        $mimeTypes = $property->getValue($rule);
+
+        $this->assertContains('application/json', $mimeTypes);
+        $this->assertCount(1, $mimeTypes);
+    }
+
+    public function testXmlMimeType(): void
+    {
+        $rule = OssUrlExists::make()->xml();
+
+        $reflection = new \ReflectionClass($rule);
+        $property = $reflection->getProperty('allowedMimeTypes');
+        $property->setAccessible(true);
+
+        $mimeTypes = $property->getValue($rule);
+
+        $this->assertContains('application/xml', $mimeTypes);
+        $this->assertContains('text/xml', $mimeTypes);
+        $this->assertCount(2, $mimeTypes);
+    }
+
+    public function testMediaMimeType(): void
+    {
+        $rule = OssUrlExists::make()->media();
+
+        $reflection = new \ReflectionClass($rule);
+        $property = $reflection->getProperty('allowedMimeTypes');
+        $property->setAccessible(true);
+
+        $mimeTypes = $property->getValue($rule);
+
+        $this->assertContains('image/*', $mimeTypes);
+        $this->assertContains('video/*', $mimeTypes);
+        $this->assertContains('audio/*', $mimeTypes);
+        $this->assertCount(3, $mimeTypes);
+    }
+
+    // ==================== 扩展名验证测试 ====================
+
+    public function testExtensionsWhitelistPass(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $content = 'test';
+        $path = 'test/' . Str::random(32) . '.txt';
+        $adapter->write($path, $content, new Config());
+
+        $url = $adapter->cdnUrl($path) ?: $adapter->url($path);
+
+        $rule = OssUrlExists::make()->extensions(['txt', 'log', 'md']);
+        $failed = false;
+
+        $rule->validate('url', $url, function ($message) use (&$failed) {
+            $failed = true;
+        });
+
+        $this->assertFalse($failed);
+
+        $adapter->delete($path);
+    }
+
+    public function testExtensionsWhitelistFail(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $content = 'test';
+        $path = 'test/' . Str::random(32) . '.txt';
+        $adapter->write($path, $content, new Config());
+
+        $url = $adapter->cdnUrl($path) ?: $adapter->url($path);
+
+        $rule = OssUrlExists::make()->extensions(['jpg', 'png', 'gif']);
+        $failed = false;
+
+        $rule->validate('url', $url, function ($message) use (&$failed) {
+            $failed = true;
+        });
+
+        $this->assertTrue($failed);
+        $this->assertSame('extension_not_allowed', $rule->getFailedReason());
+
+        $adapter->delete($path);
+    }
+
+    public function testExtensionsCaseInsensitive(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $content = 'test';
+        $path = 'test/' . Str::random(32) . '.TXT';
+        $adapter->write($path, $content, new Config());
+
+        $url = $adapter->cdnUrl($path) ?: $adapter->url($path);
+
+        $rule = OssUrlExists::make()->extensions(['txt']);
+        $failed = false;
+
+        $rule->validate('url', $url, function ($message) use (&$failed) {
+            $failed = true;
+        });
+
+        $this->assertFalse($failed);
+
+        $adapter->delete($path);
+    }
+
+    public function testExceptExtensionsPass(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $content = 'test';
+        $path = 'test/' . Str::random(32) . '.txt';
+        $adapter->write($path, $content, new Config());
+
+        $url = $adapter->cdnUrl($path) ?: $adapter->url($path);
+
+        $rule = OssUrlExists::make()->exceptExtensions(['exe', 'php', 'sh']);
+        $failed = false;
+
+        $rule->validate('url', $url, function ($message) use (&$failed) {
+            $failed = true;
+        });
+
+        $this->assertFalse($failed);
+
+        $adapter->delete($path);
+    }
+
+    public function testExceptExtensionsFail(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $content = 'test';
+        $path = 'test/' . Str::random(32) . '.php';
+        $adapter->write($path, $content, new Config());
+
+        $url = $adapter->cdnUrl($path) ?: $adapter->url($path);
+
+        $rule = OssUrlExists::make()->exceptExtensions(['exe', 'php', 'sh']);
+        $failed = false;
+
+        $rule->validate('url', $url, function ($message) use (&$failed) {
+            $failed = true;
+        });
+
+        $this->assertTrue($failed);
+        $this->assertSame('extension_forbidden', $rule->getFailedReason());
+
+        $adapter->delete($path);
+    }
+
+    // ==================== 目录验证测试 ====================
+
+    public function testDirectoryWhitelistPass(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $content = 'test';
+        $path = 'uploads/images/' . Str::random(32) . '.txt';
+        $adapter->write($path, $content, new Config());
+
+        $url = $adapter->cdnUrl($path) ?: $adapter->url($path);
+
+        $rule = OssUrlExists::make()->directory('uploads/images');
+        $failed = false;
+
+        $rule->validate('url', $url, function ($message) use (&$failed) {
+            $failed = true;
+        });
+
+        $this->assertFalse($failed);
+
+        $adapter->delete($path);
+    }
+
+    public function testDirectoryWhitelistFail(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $content = 'test';
+        $path = 'other/' . Str::random(32) . '.txt';
+        $adapter->write($path, $content, new Config());
+
+        $url = $adapter->cdnUrl($path) ?: $adapter->url($path);
+
+        $rule = OssUrlExists::make()->directory('uploads');
+        $failed = false;
+
+        $rule->validate('url', $url, function ($message) use (&$failed) {
+            $failed = true;
+        });
+
+        $this->assertTrue($failed);
+        $this->assertSame('directory_not_allowed', $rule->getFailedReason());
+
+        $adapter->delete($path);
+    }
+
+    public function testDirectoryWithLeadingSlash(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $content = 'test';
+        $path = 'uploads/' . Str::random(32) . '.txt';
+        $adapter->write($path, $content, new Config());
+
+        $url = $adapter->cdnUrl($path) ?: $adapter->url($path);
+
+        // 使用带前导斜杠的目录
+        $rule = OssUrlExists::make()->directory('/uploads/');
+        $failed = false;
+
+        $rule->validate('url', $url, function ($message) use (&$failed) {
+            $failed = true;
+        });
+
+        $this->assertFalse($failed);
+
+        $adapter->delete($path);
+    }
+
+    public function testDirectoriesWhitelistPass(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $content = 'test';
+        $path = 'images/' . Str::random(32) . '.txt';
+        $adapter->write($path, $content, new Config());
+
+        $url = $adapter->cdnUrl($path) ?: $adapter->url($path);
+
+        $rule = OssUrlExists::make()->directories(['uploads', 'images', 'files']);
+        $failed = false;
+
+        $rule->validate('url', $url, function ($message) use (&$failed) {
+            $failed = true;
+        });
+
+        $this->assertFalse($failed);
+
+        $adapter->delete($path);
+    }
+
+    public function testExceptDirectoryPass(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $content = 'test';
+        $path = 'public/' . Str::random(32) . '.txt';
+        $adapter->write($path, $content, new Config());
+
+        $url = $adapter->cdnUrl($path) ?: $adapter->url($path);
+
+        $rule = OssUrlExists::make()->exceptDirectory('private');
+        $failed = false;
+
+        $rule->validate('url', $url, function ($message) use (&$failed) {
+            $failed = true;
+        });
+
+        $this->assertFalse($failed);
+
+        $adapter->delete($path);
+    }
+
+    public function testExceptDirectoryFail(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $content = 'test';
+        $path = 'private/' . Str::random(32) . '.txt';
+        $adapter->write($path, $content, new Config());
+
+        $url = $adapter->cdnUrl($path) ?: $adapter->url($path);
+
+        $rule = OssUrlExists::make()->exceptDirectory('private');
+        $failed = false;
+
+        $rule->validate('url', $url, function ($message) use (&$failed) {
+            $failed = true;
+        });
+
+        $this->assertTrue($failed);
+        $this->assertSame('directory_forbidden', $rule->getFailedReason());
+
+        $adapter->delete($path);
+    }
+
+    public function testExceptDirectoriesFail(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $content = 'test';
+        $path = 'temp/' . Str::random(32) . '.txt';
+        $adapter->write($path, $content, new Config());
+
+        $url = $adapter->cdnUrl($path) ?: $adapter->url($path);
+
+        $rule = OssUrlExists::make()->exceptDirectories(['private', 'temp', 'cache']);
+        $failed = false;
+
+        $rule->validate('url', $url, function ($message) use (&$failed) {
+            $failed = true;
+        });
+
+        $this->assertTrue($failed);
+        $this->assertSame('directory_forbidden', $rule->getFailedReason());
+
+        $adapter->delete($path);
+    }
+
+    // ==================== 路径正则匹配测试 ====================
+
+    public function testPathMatchesPass(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $content = 'test';
+        $path = 'uploads/2024/01/' . Str::random(32) . '.txt';
+        $adapter->write($path, $content, new Config());
+
+        $url = $adapter->cdnUrl($path) ?: $adapter->url($path);
+
+        $rule = OssUrlExists::make()->pathMatches('/^uploads\/\d{4}\/\d{2}\//');
+        $failed = false;
+
+        $rule->validate('url', $url, function ($message) use (&$failed) {
+            $failed = true;
+        });
+
+        $this->assertFalse($failed);
+
+        $adapter->delete($path);
+    }
+
+    public function testPathMatchesFail(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $content = 'test';
+        $path = 'other/' . Str::random(32) . '.txt';
+        $adapter->write($path, $content, new Config());
+
+        $url = $adapter->cdnUrl($path) ?: $adapter->url($path);
+
+        $rule = OssUrlExists::make()->pathMatches('/^uploads\/\d{4}\//');
+        $failed = false;
+
+        $rule->validate('url', $url, function ($message) use (&$failed) {
+            $failed = true;
+        });
+
+        $this->assertTrue($failed);
+        $this->assertSame('path_pattern_mismatch', $rule->getFailedReason());
+
+        $adapter->delete($path);
+    }
+
+    // ==================== 文件名正则匹配测试 ====================
+
+    public function testFilenameMatchesPass(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $content = 'test';
+        $path = 'test/123_avatar.jpg';
+        $adapter->write($path, $content, new Config());
+
+        $url = $adapter->cdnUrl($path) ?: $adapter->url($path);
+
+        $rule = OssUrlExists::make()->filenameMatches('/^\d+_\w+\.\w+$/');
+        $failed = false;
+
+        $rule->validate('url', $url, function ($message) use (&$failed) {
+            $failed = true;
+        });
+
+        $this->assertFalse($failed);
+
+        $adapter->delete($path);
+    }
+
+    public function testFilenameMatchesFail(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $content = 'test';
+        $path = 'test/invalid-name.txt';
+        $adapter->write($path, $content, new Config());
+
+        $url = $adapter->cdnUrl($path) ?: $adapter->url($path);
+
+        $rule = OssUrlExists::make()->filenameMatches('/^\d+_\w+\.\w+$/');
+        $failed = false;
+
+        $rule->validate('url', $url, function ($message) use (&$failed) {
+            $failed = true;
+        });
+
+        $this->assertTrue($failed);
+        $this->assertSame('filename_pattern_mismatch', $rule->getFailedReason());
+
+        $adapter->delete($path);
+    }
+
+    // ==================== 文件名长度测试 ====================
+
+    public function testFilenameMaxLengthPass(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $content = 'test';
+        $path = 'test/short.txt';
+        $adapter->write($path, $content, new Config());
+
+        $url = $adapter->cdnUrl($path) ?: $adapter->url($path);
+
+        $rule = OssUrlExists::make()->filenameMaxLength(50);
+        $failed = false;
+
+        $rule->validate('url', $url, function ($message) use (&$failed) {
+            $failed = true;
+        });
+
+        $this->assertFalse($failed);
+
+        $adapter->delete($path);
+    }
+
+    public function testFilenameMaxLengthFail(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $content = 'test';
+        $longName = Str::random(60) . '.txt';
+        $path = 'test/' . $longName;
+        $adapter->write($path, $content, new Config());
+
+        $url = $adapter->cdnUrl($path) ?: $adapter->url($path);
+
+        $rule = OssUrlExists::make()->filenameMaxLength(50);
+        $failed = false;
+
+        $rule->validate('url', $url, function ($message) use (&$failed) {
+            $failed = true;
+        });
+
+        $this->assertTrue($failed);
+        $this->assertSame('filename_too_long', $rule->getFailedReason());
+
+        $adapter->delete($path);
+    }
+
+    // ==================== 路径信息获取测试 ====================
+
+    public function testGetPathAfterValidation(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $content = 'test';
+        $path = 'uploads/images/test.jpg';
+        $adapter->write($path, $content, new Config());
+
+        $url = $adapter->cdnUrl($path) ?: $adapter->url($path);
+
+        $rule = new OssUrlExists();
+        $rule->validate('url', $url, function ($message) {});
+
+        // 路径可能包含 prefix
+        $this->assertNotNull($rule->getPath());
+        $this->assertStringContainsString('test.jpg', $rule->getPath());
+
+        $adapter->delete($path);
+    }
+
+    public function testGetFilenameAfterValidation(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $content = 'test';
+        $path = 'uploads/images/myfile.jpg';
+        $adapter->write($path, $content, new Config());
+
+        $url = $adapter->cdnUrl($path) ?: $adapter->url($path);
+
+        $rule = new OssUrlExists();
+        $rule->validate('url', $url, function ($message) {});
+
+        $this->assertSame('myfile.jpg', $rule->getFilename());
+
+        $adapter->delete($path);
+    }
+
+    public function testGetExtensionAfterValidation(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $content = 'test';
+        $path = 'uploads/document.pdf';
+        $adapter->write($path, $content, new Config());
+
+        $url = $adapter->cdnUrl($path) ?: $adapter->url($path);
+
+        $rule = new OssUrlExists();
+        $rule->validate('url', $url, function ($message) {});
+
+        $this->assertSame('pdf', $rule->getExtension());
+
+        $adapter->delete($path);
+    }
+
+    public function testGetDirectoryAfterValidation(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $content = 'test';
+        $path = 'uploads/images/photo.jpg';
+        $adapter->write($path, $content, new Config());
+
+        $url = $adapter->cdnUrl($path) ?: $adapter->url($path);
+
+        $rule = new OssUrlExists();
+        $rule->validate('url', $url, function ($message) {});
+
+        $this->assertNotNull($rule->getDirectory());
+        $this->assertStringContainsString('uploads', $rule->getDirectory());
+
+        $adapter->delete($path);
+    }
+
+    // ==================== 组合验证测试 ====================
+
+    public function testCombinedConstraintsPass(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $content = str_repeat('x', 50);
+        $path = 'uploads/2024/' . Str::random(10) . '.txt';
+        $adapter->write($path, $content, new Config());
+
+        $url = $adapter->cdnUrl($path) ?: $adapter->url($path);
+
+        $rule = OssUrlExists::make()
+            ->directory('uploads')
+            ->extensions(['txt', 'log'])
+            ->exceptExtensions(['exe', 'php'])
+            ->filenameMaxLength(100)
+            ->sizeBetween(10, 100)
+            ->mimeTypes(['text/*']);
+
+        $failed = false;
+
+        $rule->validate('url', $url, function ($message) use (&$failed) {
+            $failed = true;
+        });
+
+        $this->assertFalse($failed);
+
+        $adapter->delete($path);
+    }
+
+    public function testCombinedConstraintsFailOnExtension(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $content = 'test';
+        $path = 'uploads/' . Str::random(10) . '.exe';
+        $adapter->write($path, $content, new Config());
+
+        $url = $adapter->cdnUrl($path) ?: $adapter->url($path);
+
+        $rule = OssUrlExists::make()
+            ->directory('uploads')
+            ->exceptExtensions(['exe', 'php']);
+
+        $failed = false;
+
+        $rule->validate('url', $url, function ($message) use (&$failed) {
+            $failed = true;
+        });
+
+        $this->assertTrue($failed);
+        $this->assertSame('extension_forbidden', $rule->getFailedReason());
+
+        $adapter->delete($path);
+    }
+
+    public function testCombinedConstraintsFailOnDirectory(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $content = 'test';
+        $path = 'private/' . Str::random(10) . '.txt';
+        $adapter->write($path, $content, new Config());
+
+        $url = $adapter->cdnUrl($path) ?: $adapter->url($path);
+
+        $rule = OssUrlExists::make()
+            ->directory('uploads')
+            ->extensions(['txt']);
+
+        $failed = false;
+
+        $rule->validate('url', $url, function ($message) use (&$failed) {
+            $failed = true;
+        });
+
+        $this->assertTrue($failed);
+        $this->assertSame('directory_not_allowed', $rule->getFailedReason());
+
+        $adapter->delete($path);
+    }
+
+    // ==================== 边界情况测试 ====================
+
+    public function testEmptyPath(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $baseUrl = $adapter->getCdnBaseUrl() ?: $adapter->getUploadBaseUrl();
+
+        $rule = new OssUrlExists();
+        $failed = false;
+
+        $rule->validate('url', $baseUrl, function ($message) use (&$failed) {
+            $failed = true;
+        });
+
+        $this->assertTrue($failed);
+        $this->assertSame('invalid_path', $rule->getFailedReason());
+    }
+
+    public function testPathInfoMethodsReturnNullBeforeValidation(): void
+    {
+        $rule = new OssUrlExists();
+
+        $this->assertNull($rule->getPath());
+        $this->assertNull($rule->getFilename());
+        $this->assertNull($rule->getExtension());
+        $this->assertNull($rule->getDirectory());
+    }
+
+    public function testFileWithoutExtension(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $content = 'test';
+        $path = 'test/noextension';
+        $adapter->write($path, $content, new Config());
+
+        $url = $adapter->cdnUrl($path) ?: $adapter->url($path);
+
+        $rule = OssUrlExists::make()->extensions(['txt']);
+        $failed = false;
+
+        $rule->validate('url', $url, function ($message) use (&$failed) {
+            $failed = true;
+        });
+
+        // 没有扩展名的文件应该无法匹配 'txt' 扩展名
+        $this->assertTrue($failed);
+        $this->assertSame('extension_not_allowed', $rule->getFailedReason());
+
+        $adapter->delete($path);
+    }
+
+    public function testNestedDirectoryValidation(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $content = 'test';
+        $path = 'uploads/images/2024/01/photo.jpg';
+        $adapter->write($path, $content, new Config());
+
+        $url = $adapter->cdnUrl($path) ?: $adapter->url($path);
+
+        // 子目录应该匹配父目录规则
+        $rule = OssUrlExists::make()->directory('uploads');
+        $failed = false;
+
+        $rule->validate('url', $url, function ($message) use (&$failed) {
+            $failed = true;
+        });
+
+        $this->assertFalse($failed);
+
+        $adapter->delete($path);
+    }
+
+    #[DataProvider('mimeTypeMethodsProvider')]
+    public function testMimeTypeMethodsSetCorrectTypes(string $method, array $expectedTypes): void
+    {
+        $rule = OssUrlExists::make()->$method();
+
+        $reflection = new \ReflectionClass($rule);
+        $property = $reflection->getProperty('allowedMimeTypes');
+        $property->setAccessible(true);
+
+        $mimeTypes = $property->getValue($rule);
+
+        foreach ($expectedTypes as $expected) {
+            $this->assertContains($expected, $mimeTypes);
+        }
+    }
+
+    public static function mimeTypeMethodsProvider(): array
+    {
+        return [
+            'image' => ['image', ['image/*']],
+            'video' => ['video', ['video/*']],
+            'audio' => ['audio', ['audio/*']],
+            'text' => ['text', ['text/*']],
+            'media' => ['media', ['image/*', 'video/*', 'audio/*']],
+        ];
+    }
 }
