@@ -149,42 +149,65 @@ class OssAdapter implements FilesystemAdapter
         return sprintf('%s.oss-%s-internal.aliyuncs.com', $this->bucket(), $this->region() ?? 'cn-hangzhou');
     }
 
+    // ==================== URL 解析 ====================
+
+    /**
+     * 解析任意 URL 为 OssUrl 对象
+     */
+    public function parseUrl($url): ?OssUrl
+    {
+        return OssUrl::tryFrom($this, $url);
+    }
+
     // ==================== URL 构建 ====================
 
-    public function url(string $path): string
+    public function url(string $path): OssUrl
     {
         return $this->ossUrl($path);
     }
 
-    public function cdnUrl(string $path): ?string
+    public function cdnUrl(string $path): ?OssUrl
     {
         if (empty($this->cdnBaseUrl())) {
             return null;
         }
 
-        return sprintf('%s/%s', rtrim($this->cdnBaseUrl(), '/'), $this->resolveKey($path));
+        $raw = sprintf('%s/%s', rtrim($this->cdnBaseUrl(), '/'), $this->resolveKey($path));
+
+        return OssUrl::from($this, $raw);
     }
 
-    public function uploadUrl(string $path): ?string
+    public function uploadUrl(string $path): ?OssUrl
     {
         if (empty($this->uploadBaseUrl())) {
             return null;
         }
 
-        return sprintf('%s/%s', rtrim($this->uploadBaseUrl(), '/'), $this->resolveKey($path));
+        $raw = sprintf('%s/%s', rtrim($this->uploadBaseUrl(), '/'), $this->resolveKey($path));
+
+        return OssUrl::from($this, $raw);
     }
 
-    public function ossUrl(string $path): string
+    public function ossUrl(string $path): OssUrl
     {
-        return sprintf('https://%s/%s', $this->ossDomain(), $this->resolveKey($path));
+        $raw = sprintf('https://%s/%s', $this->ossDomain(), $this->resolveKey($path));
+
+        return OssUrl::from($this, $raw);
     }
 
-    public function ossInternalUrl(string $path): string
+    public function ossInternalUrl(string $path): OssUrl
     {
-        return sprintf('https://%s/%s', $this->ossInternalDomain(), $this->resolveKey($path));
+        $raw = sprintf('https://%s/%s', $this->ossInternalDomain(), $this->resolveKey($path));
+
+        return OssUrl::from($this, $raw);
     }
 
-    public function signUrl(string $path, int $timeout = 60): string
+    public function ossUri(string $path): string
+    {
+        return sprintf('oss://%s/%s', $this->bucket(), $this->resolveKey($path));
+    }
+
+    public function signUrl(string $path, int $timeout = 60): OssUrl
     {
         $presignResult = $this->client()->presign(
             new Oss\Models\GetObjectRequest(
@@ -194,10 +217,10 @@ class OssAdapter implements FilesystemAdapter
             ['expires' => new \DateInterval("PT{$timeout}S")]
         );
 
-        return $presignResult->url;
+        return OssUrl::from($this, $presignResult->url);
     }
 
-    public function signUploadUrl(string $path, int $timeout = 60): string
+    public function signUploadUrl(string $path, int $timeout = 60): OssUrl
     {
         $presignResult = $this->client()->presign(
             new Oss\Models\PutObjectRequest(
@@ -207,7 +230,7 @@ class OssAdapter implements FilesystemAdapter
             ['expires' => new \DateInterval("PT{$timeout}S")]
         );
 
-        return $presignResult->url;
+        return OssUrl::from($this, $presignResult->url);
     }
 
     public function presign(string $path, int $timeout = 60, string $method = 'GET'): Oss\Models\PresignResult
@@ -223,34 +246,24 @@ class OssAdapter implements FilesystemAdapter
 
     // ==================== URL 转换 ====================
 
-    public function toCdnUrl(string $url): ?string
+    public function toCdnUrl(string $url): ?OssUrl
     {
-        return $this->convertUrlToDomain($url, $this->cdnDomain(), $this->cdnBaseUrl());
+        return $this->parseUrl($url)?->toCdn();
     }
 
-    public function toUploadUrl(string $url): ?string
+    public function toUploadUrl(string $url): ?OssUrl
     {
-        return $this->convertUrlToDomain($url, $this->uploadDomain(), $this->uploadBaseUrl());
+        return $this->parseUrl($url)?->toUpload();
     }
 
-    public function toOssUrl(string $url): string
+    public function toOssUrl(string $url): ?OssUrl
     {
-        $urlObj = HUrl::parse($url);
-        if (!$urlObj instanceof HUrl) {
-            return $url;
-        }
-
-        return $urlObj->withHost($this->ossDomain())->withScheme('https')->toString();
+        return $this->parseUrl($url)?->toOss();
     }
 
-    public function toOssInternalUrl(string $url): string
+    public function toOssInternalUrl(string $url): ?OssUrl
     {
-        $urlObj = HUrl::parse($url);
-        if (!$urlObj instanceof HUrl) {
-            return $url;
-        }
-
-        return $urlObj->withHost($this->ossInternalDomain())->withScheme('https')->toString();
+        return $this->parseUrl($url)?->toOssInternal();
     }
 
     // ==================== URL 识别 ====================
@@ -295,7 +308,7 @@ class OssAdapter implements FilesystemAdapter
         return true;
     }
 
-    public function write(string $path, string $contents, Config $config = null): void
+    public function write(string $path, string $contents, ?Config $config = null): void
     {
         $config = $config ?? new Config();
         $request = new Oss\Models\PutObjectRequest(
@@ -311,7 +324,7 @@ class OssAdapter implements FilesystemAdapter
         $this->client()->putObject($request);
     }
 
-    public function writeStream(string $path, $contents, Config $config = null): void
+    public function writeStream(string $path, $contents, ?Config $config = null): void
     {
         $config = $config ?? new Config();
         $request = new Oss\Models\PutObjectRequest(
@@ -359,7 +372,7 @@ class OssAdapter implements FilesystemAdapter
         throw new BadMethodCallException();
     }
 
-    public function createDirectory(string $path, Config $config = null): void
+    public function createDirectory(string $path, ?Config $config = null): void
     {
         $this->client()->putObject(
             new Oss\Models\PutObjectRequest(
@@ -416,7 +429,7 @@ class OssAdapter implements FilesystemAdapter
         throw new BadMethodCallException();
     }
 
-    public function copy(string $source, string $destination, Config $config = null): void
+    public function copy(string $source, string $destination, ?Config $config = null): void
     {
         $this->client()->copyObject(
             new Oss\Models\CopyObjectRequest(
@@ -428,7 +441,7 @@ class OssAdapter implements FilesystemAdapter
         );
     }
 
-    public function move(string $source, string $destination, Config $config = null): void
+    public function move(string $source, string $destination, ?Config $config = null): void
     {
         $this->copy($source, $destination, $config);
         $this->delete($source);
@@ -451,7 +464,7 @@ class OssAdapter implements FilesystemAdapter
 
     // ==================== 扩展操作 ====================
 
-    public function writeFile($file, string $path): string
+    public function writeFile($file, string $path): OssUrl
     {
         $this->write($path, file_get_contents($file));
 
@@ -461,7 +474,7 @@ class OssAdapter implements FilesystemAdapter
     /**
      * @throws GuzzleException
      */
-    public function writeFromUrl(string $url, string $path): string
+    public function writeFromUrl(string $url, string $path): OssUrl
     {
         $response = $this->getHttpClient()->get($url, ['stream' => true]);
 
@@ -479,17 +492,17 @@ class OssAdapter implements FilesystemAdapter
     /**
      * URL 变化时才上传（微信头像场景）
      */
-    public function mirrorIfChanged(mixed $sourceUrl, mixed $existingUrl, string $prefix = ''): ?string
+    public function mirrorIfChanged(mixed $sourceUrl, mixed $existingUrl, string $prefix = ''): ?OssUrl
     {
         $source = Url::parse($sourceUrl);
         $existing = Url::parse($existingUrl);
 
         if (!$source instanceof Url) {
-            return $existing instanceof Url ? $existing->toString() : null;
+            return $existing instanceof Url ? OssUrl::from($this, $existing->toString()) : null;
         }
 
         if ($existing instanceof Url && Str::contains($existing->getPath(), $source->getPath())) {
-            return $existing->toString();
+            return OssUrl::from($this, $existing->toString());
         }
 
         $path = trim(sprintf('/%s/%s', trim($prefix, '/'), trim($source->getPath(), '/')), '/');
@@ -553,25 +566,4 @@ class OssAdapter implements FilesystemAdapter
         return $urlObj instanceof HUrl && $urlObj->getHost() === $domain;
     }
 
-    private function convertUrlToDomain(string $url, ?string $domain, ?string $baseUrl): ?string
-    {
-        if ($domain === null) {
-            return null;
-        }
-
-        $urlObj = HUrl::parse($url);
-        if (!$urlObj instanceof HUrl) {
-            return null;
-        }
-
-        $scheme = 'https';
-        if ($baseUrl !== null) {
-            $baseUrlObj = HUrl::parse($baseUrl);
-            if ($baseUrlObj instanceof HUrl) {
-                $scheme = $baseUrlObj->getScheme();
-            }
-        }
-
-        return $urlObj->withHost($domain)->withScheme($scheme)->toString();
-    }
 }

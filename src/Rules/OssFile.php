@@ -11,7 +11,7 @@ use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Storage;
 use League\Flysystem\FileAttributes;
 
-class OssUrl implements ValidationRule
+class OssFile implements ValidationRule
 {
     protected ?string $disk;
     protected bool $checkFileExists = true;

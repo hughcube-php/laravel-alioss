@@ -78,11 +78,11 @@ class OssAdapterTest extends TestCase
             'uploadBaseUrl' => 'https://upload.example.com',
         ]);
 
-        $this->assertSame('https://test-bucket.oss-cn-hangzhou.aliyuncs.com/file.jpg', $adapter->url('file.jpg'));
-        $this->assertSame('https://test-bucket.oss-cn-hangzhou.aliyuncs.com/file.jpg', $adapter->ossUrl('file.jpg'));
-        $this->assertSame('https://cdn.example.com/file.jpg', $adapter->cdnUrl('file.jpg'));
-        $this->assertSame('https://upload.example.com/file.jpg', $adapter->uploadUrl('file.jpg'));
-        $this->assertSame('https://test-bucket.oss-cn-hangzhou-internal.aliyuncs.com/file.jpg', $adapter->ossInternalUrl('file.jpg'));
+        $this->assertSame('https://test-bucket.oss-cn-hangzhou.aliyuncs.com/file.jpg', (string) $adapter->url('file.jpg'));
+        $this->assertSame('https://test-bucket.oss-cn-hangzhou.aliyuncs.com/file.jpg', (string) $adapter->ossUrl('file.jpg'));
+        $this->assertSame('https://cdn.example.com/file.jpg', (string) $adapter->cdnUrl('file.jpg'));
+        $this->assertSame('https://upload.example.com/file.jpg', (string) $adapter->uploadUrl('file.jpg'));
+        $this->assertSame('https://test-bucket.oss-cn-hangzhou-internal.aliyuncs.com/file.jpg', (string) $adapter->ossInternalUrl('file.jpg'));
     }
 
     public function testCdnUrlReturnsNullWhenNotConfigured(): void
@@ -106,24 +106,22 @@ class OssAdapterTest extends TestCase
             'cdnBaseUrl' => 'https://cdn.example.com',
         ]);
 
-        $this->assertSame('https://cdn.example.com/pre/file.jpg', $adapter->cdnUrl('file.jpg'));
-        $this->assertSame('https://test-bucket.oss-cn-hangzhou.aliyuncs.com/pre/file.jpg', $adapter->ossUrl('file.jpg'));
+        $this->assertSame('https://cdn.example.com/pre/file.jpg', (string) $adapter->cdnUrl('file.jpg'));
+        $this->assertSame('https://test-bucket.oss-cn-hangzhou.aliyuncs.com/pre/file.jpg', (string) $adapter->ossUrl('file.jpg'));
     }
 
     public function testSignUrl(): void
     {
         $adapter = $this->getOssAdapter();
         $url = $adapter->signUrl('test/file.jpg', 60);
-        $this->assertIsString($url);
-        $this->assertStringContainsString('x-oss-signature', $url);
+        $this->assertStringContainsString('x-oss-signature', (string) $url);
     }
 
     public function testSignUploadUrl(): void
     {
         $adapter = $this->getOssAdapter();
         $url = $adapter->signUploadUrl('test/file.jpg', 60);
-        $this->assertIsString($url);
-        $this->assertStringContainsString('x-oss-signature', $url);
+        $this->assertStringContainsString('x-oss-signature', (string) $url);
     }
 
     public function testPresign(): void
@@ -148,18 +146,18 @@ class OssAdapterTest extends TestCase
 
         $cdn = 'https://cdn.example.com/path/file.jpg';
         $oss = $adapter->toOssUrl($cdn);
-        $this->assertStringContainsString('test-bucket.oss-cn-hangzhou.aliyuncs.com', $oss);
-        $this->assertStringContainsString('/path/file.jpg', $oss);
+        $this->assertStringContainsString('test-bucket.oss-cn-hangzhou.aliyuncs.com', (string) $oss);
+        $this->assertStringContainsString('/path/file.jpg', (string) $oss);
 
-        $back = $adapter->toCdnUrl($oss);
-        $this->assertStringContainsString('cdn.example.com', $back);
-        $this->assertStringContainsString('/path/file.jpg', $back);
+        $back = $adapter->toCdnUrl((string) $oss);
+        $this->assertStringContainsString('cdn.example.com', (string) $back);
+        $this->assertStringContainsString('/path/file.jpg', (string) $back);
 
         $upload = $adapter->toUploadUrl($cdn);
-        $this->assertStringContainsString('upload.example.com', $upload);
+        $this->assertStringContainsString('upload.example.com', (string) $upload);
 
         $internal = $adapter->toOssInternalUrl($cdn);
-        $this->assertStringContainsString('oss-cn-hangzhou-internal', $internal);
+        $this->assertStringContainsString('oss-cn-hangzhou-internal', (string) $internal);
     }
 
     public function testToCdnUrlReturnsNullWhenNotConfigured(): void
@@ -322,8 +320,7 @@ class OssAdapterTest extends TestCase
 
         try {
             $url = $adapter->writeFile($tmpFile, $path);
-            $this->assertIsString($url);
-            $this->assertStringContainsString($path, $url);
+            $this->assertStringContainsString($path, (string) $url);
             $this->assertSame('test content', $adapter->read($path));
             $adapter->delete($path);
         } finally {
