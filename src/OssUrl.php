@@ -10,6 +10,7 @@ class OssUrl extends HUrl
     protected ?OssAdapter $adapter = null;
 
 
+
     // ==================== 工厂方法 ====================
 
     /**
@@ -113,6 +114,16 @@ class OssUrl extends HUrl
         $path = ltrim($this->getPath(), '/');
 
         return sprintf('oss://%s/%s', $bucket, $path);
+    }
+
+    /**
+     * 获取 OSS object key（URL path 去掉前导 /）。
+     *
+     * @return string OSS key，如 "path/to/file.jpg"
+     */
+    public function key(): string
+    {
+        return ltrim($this->getPath(), '/');
     }
 
     // ==================== 域名识别 ====================

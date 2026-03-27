@@ -529,6 +529,88 @@ class OssAdapter implements FilesystemAdapter
         );
     }
 
+    /**
+     * 获取上传 endpoint（不含路径），如 https://bucket.oss-cn-shanghai.aliyuncs.com
+     */
+    public function uploadEndpoint(): string
+    {
+        return sprintf('https://%s', $this->ossDomain());
+    }
+
+    /**
+     * 获取图片元信息（ImageWidth、ImageHeight、Format、FileSize 等）。
+     *
+     * 自动识别参数：传入 path 或完整 URL 均可。
+     * 文件不存在或非图片返回 null。
+     *
+     * @param string $pathOrUrl 相对路径或完整 URL
+     * @return array|null
+     */
+    public function fetchImageInfo(string $pathOrUrl): ?array
+    {
+        $key = $this->resolvePathOrUrl($pathOrUrl);
+        if ($key === null) {
+            return null;
+        }
+
+        try {
+            $result = $this->client()->getObject(
+                new Oss\Models\GetObjectRequest(
+                    bucket: $this->bucket(),
+                    key: $key,
+                    process: 'image/info',
+                )
+            );
+
+            $data = json_decode($result->body->getContents(), true);
+
+            return is_array($data) ? $data : null;
+        } catch (Oss\Exception\OperationException $e) {
+            $prev = $e->getPrevious();
+            if ($prev instanceof Oss\Exception\ServiceException && $prev->getStatusCode() === 404) {
+                return null;
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * 获取文件属性（大小、MIME、最后修改时间）。
+     *
+     * 自动识别参数：传入 path 或完整 URL 均可。
+     * 与 Flysystem 的 fileAttributes() 不同：此方法接受 URL，且文件不存在返回 null 而非抛异常。
+     *
+     * @param string $pathOrUrl 相对路径或完整 URL
+     * @return FileAttributes|null
+     */
+    public function fetchAttributes(string $pathOrUrl): ?FileAttributes
+    {
+        $key = $this->resolvePathOrUrl($pathOrUrl);
+        if ($key === null) {
+            return null;
+        }
+
+        try {
+            $result = $this->client()->headObject(
+                new Oss\Models\HeadObjectRequest(bucket: $this->bucket(), key: $key)
+            );
+
+            return new FileAttributes(
+                $key,
+                $result->contentLength ?? null,
+                null,
+                $result->lastModified?->getTimestamp(),
+                $result->contentType ?? null
+            );
+        } catch (Oss\Exception\OperationException $e) {
+            $prev = $e->getPrevious();
+            if ($prev instanceof Oss\Exception\ServiceException && $prev->getStatusCode() === 404) {
+                return null;
+            }
+            throw $e;
+        }
+    }
+
     // ==================== 工具 ====================
 
     public static function watermarkText(string $text): string
@@ -541,6 +623,26 @@ class OssAdapter implements FilesystemAdapter
     private function resolveKey(string $path): string
     {
         return ltrim($this->prefixer()->prefixPath($path), '/');
+    }
+
+    /**
+     * 自动识别参数是 path 还是 URL，返回 OSS key。
+     * URL 直接取 path 部分（不走 prefix），普通 path 走 resolveKey。
+     */
+    private function resolvePathOrUrl(string $pathOrUrl): ?string
+    {
+        if (HUrl::isUrlString($pathOrUrl)) {
+            $parsed = HUrl::parse($pathOrUrl);
+            if (!$parsed instanceof HUrl) {
+                return null;
+            }
+
+            $key = ltrim($parsed->getPath(), '/');
+
+            return !empty($key) ? $key : null;
+        }
+
+        return $this->resolveKey($pathOrUrl);
     }
 
     private function defaultAcl(): string
