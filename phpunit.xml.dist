@@ -1,30 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<phpunit backupGlobals="false"
-         backupStaticAttributes="false"
-         bootstrap="vendor/autoload.php"
-         colors="true"
-         convertErrorsToExceptions="true"
-         convertNoticesToExceptions="true"
-         convertWarningsToExceptions="true"
-         processIsolation="false"
-         stopOnFailure="false">
-    <testsuites>
-        <testsuite name="Application Test Suite">
-            <directory>./tests/</directory>
-        </testsuite>
-    </testsuites>
-    <filter>
-        <whitelist>
-            <directory suffix=".php">src/</directory>
-        </whitelist>
-    </filter>
-    <php>
-        <env name="ALIOSS_ACCESS_KEY_ID" value="" force="true"/>
-        <env name="ALIOSS_ACCESS_KEY_SECRET" value="" force="true"/>
-        <env name="ALIOSS_ENDPOINT" value="" force="true"/>
-        <env name="ALIOSS_BUCKET" value="" force="true"/>
-        <env name="ALIOSS_IS_CNAME" value="false" force="true"/>
-        <env name="ALIOSS_SECURITY_TOKEN" value="" force="true"/>
-        <env name="requestProxy" value="" force="true"/>
-    </php>
+<phpunit backupGlobals="false" bootstrap="tests/bootstrap.php" colors="true" processIsolation="false" stopOnFailure="false" cacheDirectory=".phpunit.cache" backupStaticProperties="false">
+  <testsuites>
+    <testsuite name="Application Test Suite">
+      <directory>./tests/</directory>
+    </testsuite>
+  </testsuites>
+  <php>
+    <env name="ALIOSS_ACCESS_KEY_ID" value="" force="true"/>
+    <env name="ALIOSS_ACCESS_KEY_SECRET" value="" force="true"/>
+    <env name="ALIOSS_ENDPOINT" value="" force="true"/>
+    <env name="ALIOSS_BUCKET" value="" force="true"/>
+    <env name="ALIOSS_REGION" value="cn-shanghai" force="true"/>
+    <env name="ALIOSS_IS_CNAME" value="false" force="true"/>
+    <env name="ALIOSS_CDN_BASE_URL" value="" force="true"/>
+    <env name="ALIOSS_UPLOAD_BASE_URL" value="" force="true"/>
+    <env name="ALIOSS_SECURITY_TOKEN" value="" force="true"/>
+    <env name="ALIOSS_PREFIX" value="" force="true"/>
+  </php>
+  <source>
+    <include>
+      <directory suffix=".php">src/</directory>
+    </include>
+  </source>
 </phpunit>

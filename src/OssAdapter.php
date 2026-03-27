@@ -1,61 +1,117 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: hugh.li
- * Date: 2022/3/23
- * Time: 23:00.
- */
 
 namespace HughCube\Laravel\AliOSS;
 
+use AlibabaCloud\Oss\V2 as Oss;
 use BadMethodCallException;
 use GuzzleHttp\Exception\GuzzleException;
 use HughCube\GuzzleHttp\HttpClientTrait;
 use HughCube\PUrl\HUrl;
 use HughCube\PUrl\Url;
 use Illuminate\Support\Str;
-use League\Flysystem\Config as Options;
+use League\Flysystem\Config;
 use League\Flysystem\FileAttributes;
 use League\Flysystem\FilesystemAdapter;
 use League\Flysystem\PathPrefixer;
-use OSS\Core\OssException;
-use OSS\OssClient;
 
-/**
- * @mixin OssClient
- */
 class OssAdapter implements FilesystemAdapter
 {
     use HttpClientTrait;
 
+    public const DOMAIN_CDN = 'cdn';
+    public const DOMAIN_UPLOAD = 'upload';
+    public const DOMAIN_OSS = 'oss';
+    public const DOMAIN_OSS_INTERNAL = 'oss_internal';
+
     private array $config;
+    private ?Oss\Client $ossClient = null;
+    private ?PathPrefixer $prefixer = null;
 
-    private null|OssClient $ossClient = null;
-
-    private null|PathPrefixer $prefixer = null;
-
-    /**
-     * @param array $config
-     */
     public function __construct(array $config)
     {
         $this->config = $config;
     }
 
-    public function forbidOverwriteOptions(): Options
+    // ==================== 配置 ====================
+
+    public function client(): Oss\Client
     {
-        return new Options([
-            'options' => [
-                OssClient::OSS_HEADERS => [
-                    'x-oss-forbid-overwrite' => 'true',
-                ],
-            ],
-        ]);
+        if ($this->ossClient === null) {
+            $credentialsProvider = new Oss\Credentials\StaticCredentialsProvider(
+                $this->config['accessKeyId'],
+                $this->config['accessKeySecret'],
+                ($this->config['securityToken'] ?? null) ?: null
+            );
+
+            $cfg = Oss\Config::loadDefault();
+            $cfg->setCredentialsProvider($credentialsProvider);
+            $cfg->setRegion($this->region() ?? 'cn-hangzhou');
+
+            $endpoint = $this->config['endpoint'] ?? null;
+            if (!empty($endpoint)) {
+                $cfg->setEndpoint($endpoint);
+            }
+
+            if (!empty($this->config['internal'])) {
+                $cfg->setUseInternalEndpoint(true);
+            }
+
+            if (!empty($this->config['isCName'])) {
+                $cfg->setUseCname(true);
+            }
+
+            $proxy = ($this->config['requestProxy'] ?? null) ?: null;
+            if (!empty($proxy)) {
+                $cfg->setProxyHost($proxy);
+            }
+
+            $this->ossClient = new Oss\Client($cfg);
+        }
+
+        return $this->ossClient;
+    }
+
+    public function bucket(): string
+    {
+        return $this->config['bucket'];
+    }
+
+    public function region(): ?string
+    {
+        return ($this->config['region'] ?? null) ?: null;
+    }
+
+    public function accessKeyId(): string
+    {
+        return $this->config['accessKeyId'];
+    }
+
+    public function accessKeySecret(): string
+    {
+        return $this->config['accessKeySecret'];
+    }
+
+    public function prefixer(): PathPrefixer
+    {
+        if ($this->prefixer === null) {
+            $this->prefixer = new PathPrefixer(($this->config['prefix'] ?? '') ?: '', '/');
+        }
+
+        return $this->prefixer;
+    }
+
+    public function cdnBaseUrl(): ?string
+    {
+        return ($this->config['cdnBaseUrl'] ?? null) ?: null;
+    }
+
+    public function uploadBaseUrl(): ?string
+    {
+        return ($this->config['uploadBaseUrl'] ?? null) ?: null;
     }
 
     public function withConfig(array $config = []): static
     {
-        /** @phpstan-ignore-next-line */
         return new static(array_merge($this->config, $config));
     }
 
@@ -64,183 +120,226 @@ class OssAdapter implements FilesystemAdapter
         return $this->withConfig(['bucket' => $bucket]);
     }
 
-    /**
-     * @throws
-     * @phpstan-ignore-next-line
-     */
-    public function getOssClient(): OssClient
+    public function noOverwrite(): Config
     {
-        if (!$this->ossClient instanceof OssClient) {
-            $this->ossClient = new OssClient(
-                $this->config['accessKeyId'],
-                $this->config['accessKeySecret'],
-                $this->config['endpoint'],
-                (($this->config['isCName'] ?? false) ?: false),
-                (($this->config['securityToken'] ?? null) ?: null),
-                (($this->config['requestProxy'] ?? null) ?: null)
-            );
-        }
-
-        return $this->ossClient;
+        return new Config(['forbidOverwrite' => true]);
     }
 
-    public function getPrefixer(): PathPrefixer
+    // ==================== 域名 ====================
+
+    public function cdnDomain(): ?string
     {
-        if (!$this->prefixer instanceof PathPrefixer) {
-            $this->prefixer = new PathPrefixer((($this->config['prefix'] ?? '') ?: ''), '/');
-        }
-
-        return $this->prefixer;
-    }
-
-    public function getBucket()
-    {
-        return $this->config['bucket'];
-    }
-
-    public function getAccessKeyId()
-    {
-        return $this->config['accessKeyId'];
-    }
-
-    public function getAccessKeySecret()
-    {
-        return $this->config['accessKeySecret'];
-    }
-
-    public function getCdnBaseUrl()
-    {
-        return ($this->config['cdnBaseUrl'] ?? null) ?: null;
-    }
-
-    public function getUploadBaseUrl()
-    {
-        return ($this->config['uploadBaseUrl'] ?? null) ?: null;
-    }
-
-    public function getRegionId()
-    {
-        return ($this->config['regionId'] ?? null) ?: null;
-    }
-
-    public function getOssOriginalDomain($internal = false): string
-    {
-        if ($internal) {
-            return sprintf('%s.oss-%s-internal.aliyuncs.com', $this->getBucket(), $this->getRegionId());
-        }
-
-        return sprintf('%s.oss-%s.aliyuncs.com', $this->getBucket(), $this->getRegionId());
-    }
-
-    public function getUploadDomain(): ?string
-    {
-        $url = HUrl::parse($this->getUploadBaseUrl());
+        $url = HUrl::parse($this->cdnBaseUrl());
         return $url instanceof HUrl ? $url->getHost() : null;
     }
 
-    public function getCdnDomain(): ?string
+    public function uploadDomain(): ?string
     {
-        $url = HUrl::parse($this->getCdnBaseUrl());
+        $url = HUrl::parse($this->uploadBaseUrl());
         return $url instanceof HUrl ? $url->getHost() : null;
     }
 
-    public function makePath(string $path, Options $config = null): string
+    public function ossDomain(): string
     {
-        if (!$config instanceof Options || null === $config->get('with_prefix') || $config->get('with_prefix')) {
-            return $this->getPrefixer()->prefixPath($path);
+        return sprintf('%s.oss-%s.aliyuncs.com', $this->bucket(), $this->region() ?? 'cn-hangzhou');
+    }
+
+    public function ossInternalDomain(): string
+    {
+        return sprintf('%s.oss-%s-internal.aliyuncs.com', $this->bucket(), $this->region() ?? 'cn-hangzhou');
+    }
+
+    // ==================== URL 构建 ====================
+
+    public function url(string $path): string
+    {
+        return $this->ossUrl($path);
+    }
+
+    public function cdnUrl(string $path): ?string
+    {
+        if (empty($this->cdnBaseUrl())) {
+            return null;
         }
 
-        return $path;
+        return sprintf('%s/%s', rtrim($this->cdnBaseUrl(), '/'), $this->resolveKey($path));
     }
 
-    /**
-     * @throws OssException
-     */
-    public function getDefaultAcl()
+    public function uploadUrl(string $path): ?string
     {
-        return $this->config['acl'] ?? $this->getOssClient()->getBucketAcl($this->getBucket());
+        if (empty($this->uploadBaseUrl())) {
+            return null;
+        }
+
+        return sprintf('%s/%s', rtrim($this->uploadBaseUrl(), '/'), $this->resolveKey($path));
     }
 
-    /**
-     * @inheritDoc
-     */
-    public function fileExists(string $path, Options $config = null): bool
+    public function ossUrl(string $path): string
     {
-        $config = $config ?? new Options();
+        return sprintf('https://%s/%s', $this->ossDomain(), $this->resolveKey($path));
+    }
 
-        return $this->getOssClient()->doesObjectExist(
-            $this->getBucket(),
-            ltrim($this->makePath($path, $config), '/'),
-            $config->get('options')
+    public function ossInternalUrl(string $path): string
+    {
+        return sprintf('https://%s/%s', $this->ossInternalDomain(), $this->resolveKey($path));
+    }
+
+    public function signUrl(string $path, int $timeout = 60): string
+    {
+        $presignResult = $this->client()->presign(
+            new Oss\Models\GetObjectRequest(
+                bucket: $this->bucket(),
+                key: $this->resolveKey($path),
+            ),
+            ['expires' => new \DateInterval("PT{$timeout}S")]
         );
+
+        return $presignResult->url;
     }
 
-    /**
-     * @inheritDoc
-     */
-    public function directoryExists(string $path, Options $options = null): bool
+    public function signUploadUrl(string $path, int $timeout = 60): string
+    {
+        $presignResult = $this->client()->presign(
+            new Oss\Models\PutObjectRequest(
+                bucket: $this->bucket(),
+                key: $this->resolveKey($path),
+            ),
+            ['expires' => new \DateInterval("PT{$timeout}S")]
+        );
+
+        return $presignResult->url;
+    }
+
+    public function presign(string $path, int $timeout = 60, string $method = 'GET'): Oss\Models\PresignResult
+    {
+        $request = match (strtoupper($method)) {
+            'PUT'   => new Oss\Models\PutObjectRequest(bucket: $this->bucket(), key: $this->resolveKey($path)),
+            'HEAD'  => new Oss\Models\HeadObjectRequest(bucket: $this->bucket(), key: $this->resolveKey($path)),
+            default => new Oss\Models\GetObjectRequest(bucket: $this->bucket(), key: $this->resolveKey($path)),
+        };
+
+        return $this->client()->presign($request, ['expires' => new \DateInterval("PT{$timeout}S")]);
+    }
+
+    // ==================== URL 转换 ====================
+
+    public function toCdnUrl(string $url): ?string
+    {
+        return $this->convertUrlToDomain($url, $this->cdnDomain(), $this->cdnBaseUrl());
+    }
+
+    public function toUploadUrl(string $url): ?string
+    {
+        return $this->convertUrlToDomain($url, $this->uploadDomain(), $this->uploadBaseUrl());
+    }
+
+    public function toOssUrl(string $url): string
+    {
+        $urlObj = HUrl::parse($url);
+        if (!$urlObj instanceof HUrl) {
+            return $url;
+        }
+
+        return $urlObj->withHost($this->ossDomain())->withScheme('https')->toString();
+    }
+
+    public function toOssInternalUrl(string $url): string
+    {
+        $urlObj = HUrl::parse($url);
+        if (!$urlObj instanceof HUrl) {
+            return $url;
+        }
+
+        return $urlObj->withHost($this->ossInternalDomain())->withScheme('https')->toString();
+    }
+
+    // ==================== URL 识别 ====================
+
+    public function isCdnUrl(string $url): bool
+    {
+        return $this->matchUrlHost($url, $this->cdnDomain());
+    }
+
+    public function isUploadUrl(string $url): bool
+    {
+        return $this->matchUrlHost($url, $this->uploadDomain());
+    }
+
+    public function isOssUrl(string $url): bool
+    {
+        return $this->matchUrlHost($url, $this->ossDomain());
+    }
+
+    public function isOssInternalUrl(string $url): bool
+    {
+        return $this->matchUrlHost($url, $this->ossInternalDomain());
+    }
+
+    public function isBucketUrl(string $url): bool
+    {
+        return $this->isCdnUrl($url)
+            || $this->isUploadUrl($url)
+            || $this->isOssUrl($url)
+            || $this->isOssInternalUrl($url);
+    }
+
+    // ==================== Flysystem FilesystemAdapter ====================
+
+    public function fileExists(string $path): bool
+    {
+        return $this->client()->isObjectExist($this->bucket(), $this->resolveKey($path));
+    }
+
+    public function directoryExists(string $path): bool
     {
         return true;
     }
 
-    /**
-     * @inheritDoc
-     */
-    public function write(string $path, string $contents, Options $config = null): void
+    public function write(string $path, string $contents, Config $config = null): void
     {
-        $config = $config ?? new Options();
-
-        $this->getOssClient()->putObject(
-            $this->getBucket(),
-            ltrim($this->makePath($path, $config), '/'),
-            $contents,
-            $config->get('options')
+        $config = $config ?? new Config();
+        $request = new Oss\Models\PutObjectRequest(
+            bucket: $this->bucket(),
+            key: $this->resolveKey($path),
+            body: Oss\Utils::streamFor($contents),
         );
+
+        if ($config->get('forbidOverwrite')) {
+            $request->forbidOverwrite = true;
+        }
+
+        $this->client()->putObject($request);
     }
 
-    /**
-     * @inheritDoc
-     */
-    public function writeStream(string $path, $contents, Options $config = null): void
+    public function writeStream(string $path, $contents, Config $config = null): void
     {
-        $config = $config ?? new Options();
-
-        $this->getOssClient()->putObject(
-            $this->getBucket(),
-            ltrim($this->makePath($path, $config), '/'),
-            stream_get_contents($contents),
-            $config->get('options')
+        $config = $config ?? new Config();
+        $request = new Oss\Models\PutObjectRequest(
+            bucket: $this->bucket(),
+            key: $this->resolveKey($path),
+            body: Oss\Utils::streamFor($contents),
         );
+
+        if ($config->get('forbidOverwrite')) {
+            $request->forbidOverwrite = true;
+        }
+
+        $this->client()->putObject($request);
     }
 
-    /**
-     * @inheritDoc
-     */
-    public function read(string $path, Options $config = null): string
+    public function read(string $path): string
     {
-        $config = $config ?? new Options();
-
-        return $this->getOssClient()->getObject(
-            $this->getBucket(),
-            ltrim($this->makePath($path, $config), '/'),
-            $config->get('options')
+        $result = $this->client()->getObject(
+            new Oss\Models\GetObjectRequest(bucket: $this->bucket(), key: $this->resolveKey($path))
         );
+
+        return $result->body->getContents();
     }
 
-    /**
-     * @inheritDoc
-     */
-    public function readStream(string $path, Options $config = null)
+    public function readStream(string $path)
     {
-        $config = $config ?? new Options();
+        $contents = $this->read($path);
 
-        $contents = $this->getOssClient()->getObject(
-            $this->getBucket(),
-            ltrim($this->makePath($path, $config), '/'),
-            $config->get('options')
-        );
-
-        /** @var resource $stream */
         $stream = fopen('php://temp', 'w+b');
         fwrite($stream, $contents);
         rewind($stream);
@@ -248,444 +347,231 @@ class OssAdapter implements FilesystemAdapter
         return $stream;
     }
 
-    /**
-     * @inheritDoc
-     */
-    public function delete(string $path, Options $config = null): void
+    public function delete(string $path): void
     {
-        $config = $config ?? new Options();
-
-        $this->getOssClient()->deleteObject(
-            $this->getBucket(),
-            ltrim($this->makePath($path, $config), '/'),
-            $config->get('options')
+        $this->client()->deleteObject(
+            new Oss\Models\DeleteObjectRequest(bucket: $this->bucket(), key: $this->resolveKey($path))
         );
     }
 
-    /**
-     * @inheritDoc
-     */
-    public function deleteDirectory(string $path, Options $config = null): void
+    public function deleteDirectory(string $path): void
     {
         throw new BadMethodCallException();
     }
 
-    /**
-     * @inheritDoc
-     */
-    public function createDirectory(string $path, Options $config = null): void
+    public function createDirectory(string $path, Config $config = null): void
     {
-        $config = $config ?? new Options();
-
-        $this->getOssClient()->createObjectDir(
-            $this->getBucket(),
-            ltrim($this->makePath($path, $config), '/'),
-            $config->get('options')
+        $this->client()->putObject(
+            new Oss\Models\PutObjectRequest(
+                bucket: $this->bucket(),
+                key: $this->resolveKey($path) . '/',
+                body: Oss\Utils::streamFor(''),
+                contentType: 'application/x-directory',
+            )
         );
     }
 
-    /**
-     * @inheritDoc
-     *
-     * @throws OssException
-     */
-    public function setVisibility(string $path, string $visibility, Options $config = null): void
+    public function setVisibility(string $path, string $visibility): void
     {
-        $config = $config ?? new Options();
-
-        $this->getOssClient()->putObjectAcl(
-            $this->getBucket(),
-            ltrim($this->makePath($path, $config), '/'),
-            Acl::toAcl($visibility),
-            $config->get('options')
+        $this->client()->putObjectAcl(
+            new Oss\Models\PutObjectAclRequest(
+                bucket: $this->bucket(),
+                key: $this->resolveKey($path),
+                acl: Acl::toAcl($visibility),
+            )
         );
     }
 
-    /**
-     * @inheritDoc
-     *
-     * @throws OssException
-     */
-    public function visibility(string $path, Options $config = null): FileAttributes
+    public function visibility(string $path): FileAttributes
     {
-        $config = $config ?? new Options();
-
-        $acl = $this->getOssClient()->getObjectAcl(
-            $this->getBucket(),
-            ltrim($this->makePath($path, $config), '/'),
-            $config->get('options')
+        $result = $this->client()->getObjectAcl(
+            new Oss\Models\GetObjectAclRequest(bucket: $this->bucket(), key: $this->resolveKey($path))
         );
 
-        $acl = 'default' === $acl ? $this->getDefaultAcl() : $acl;
+        $acl = $result->accessControlList->grant ?? 'default';
+        if ($acl === 'default') {
+            $acl = $this->defaultAcl();
+        }
 
         return new FileAttributes($path, null, Acl::toVisibility($acl));
     }
 
-    /**
-     * @inheritDoc
-     * @deprecated 使用 getFileAttributes() 代替
-     */
-    public function mimeType(string $path, Options $config = null): FileAttributes
+    public function mimeType(string $path): FileAttributes
     {
-        return $this->getFileAttributes($path, $config);
+        return $this->fileAttributes($path);
     }
 
-    /**
-     * @inheritDoc
-     * @deprecated 使用 getFileAttributes() 代替
-     */
-    public function lastModified(string $path, Options $config = null): FileAttributes
+    public function lastModified(string $path): FileAttributes
     {
-        return $this->getFileAttributes($path, $config);
+        return $this->fileAttributes($path);
     }
 
-    /**
-     * @inheritDoc
-     * @deprecated 使用 getFileAttributes() 代替
-     */
-    public function fileSize(string $path, Options $config = null): FileAttributes
+    public function fileSize(string $path): FileAttributes
     {
-        return $this->getFileAttributes($path, $config);
+        return $this->fileAttributes($path);
     }
 
-    /**
-     * @inheritDoc
-     */
-    public function listContents(string $path, bool $deep, Options $config = null): iterable
+    public function listContents(string $path, bool $deep): iterable
     {
         throw new BadMethodCallException();
     }
 
-    /**
-     * @inheritDoc
-     *
-     * @throws OssException
-     */
-    public function copy(string $source, string $destination, Options $config = null): void
+    public function copy(string $source, string $destination, Config $config = null): void
     {
-        $config = $config ?? new Options();
-
-        $this->getOssClient()->copyObject(
-            $this->getBucket(), ltrim($this->makePath($source, $config), '/'),
-            $this->getBucket(), ltrim($this->makePath($destination, $config), '/'),
-            $config->get('options')
+        $this->client()->copyObject(
+            new Oss\Models\CopyObjectRequest(
+                bucket: $this->bucket(),
+                key: $this->resolveKey($destination),
+                sourceBucket: $this->bucket(),
+                sourceKey: $this->resolveKey($source),
+            )
         );
     }
 
-    /**
-     * @inheritDoc
-     *
-     * @throws OssException
-     */
-    public function move(string $source, string $destination, Options $config = null): void
+    public function move(string $source, string $destination, Config $config = null): void
     {
-        $config = $config ?? new Options();
-
-        $this->getOssClient()->copyObject(
-            $this->getBucket(), ltrim($this->makePath($source, $config), '/'),
-            $this->getBucket(), ltrim($this->makePath($destination, $config), '/'),
-            $config->get('options')
-        );
-
-        $this->getOssClient()->deleteObject(
-            $this->getBucket(), ltrim($this->makePath($source, $config), '/'),
-            $config->get('options')
-        );
+        $this->copy($source, $destination, $config);
+        $this->delete($source);
     }
 
-    public function getFileAttributes($path, Options $config = null): FileAttributes
+    public function fileAttributes(string $path): FileAttributes
     {
-        $config = $config ?? new Options();
-
-        $meta = $this->getOssClient()->getObjectMeta(
-            $this->getBucket(), ltrim($this->makePath($path, $config), '/'),
-            $config->get('options')
+        $result = $this->client()->headObject(
+            new Oss\Models\HeadObjectRequest(bucket: $this->bucket(), key: $this->resolveKey($path))
         );
 
         return new FileAttributes(
             $path,
-            $meta['content-length'] ?? null,
+            $result->contentLength ?? null,
             null,
-            $meta['info']['filetime'] ?? null,
-            $meta['content-type'] ?? null
+            $result->lastModified?->getTimestamp(),
+            $result->contentType ?? null
         );
     }
 
-    /**
-     * @throws OssException
-     */
-    public function authUrl($path, $timeout = 60, $method = OssClient::OSS_HTTP_GET, Options $config = null): string
+    // ==================== 扩展操作 ====================
+
+    public function writeFile($file, string $path): string
     {
-        $config = $config ?? new Options();
+        $this->write($path, file_get_contents($file));
 
-        $url = HUrl::parse($path);
-        $path = $url instanceof HUrl ? $url->getPath() : $this->makePath($path, $config);
-
-        $signUrl = $this->getOssClient()->signUrl(
-            $this->getBucket(), ltrim($path, '/'),
-            $timeout, $method, $config->get('options')
-        );
-        if (!$url instanceof HUrl) {
-            return $signUrl;
-        }
-
-        foreach (HUrl::instance($signUrl)->getQueryArray() as $name => $value) {
-            $url = $url->withQueryValue($name, $value);
-        }
-
-        return $url->toString();
-    }
-
-    public function cdnUrl($path, Options $config = null): null|string
-    {
-        if (empty($this->getCdnBaseUrl())) {
-            return null;
-        }
-
-        if (!($url = HUrl::parse($path)) instanceof HUrl) {
-            return sprintf(
-                '%s/%s',
-                rtrim($this->getCdnBaseUrl(), '/'),
-                ltrim($this->makePath($path, $config), '/')
-            );
-        }
-
-        $baseUrl = HUrl::instance($this->getCdnBaseUrl());
-
-        return $url->withHost($baseUrl->getHost())->withScheme($baseUrl->getScheme())->toString();
-    }
-
-    /**
-     * @throws OssException
-     */
-    public function url($path, Options $config = null): string
-    {
-        $url = $this->authUrl($path, 60, OssClient::OSS_HTTP_GET, $config);
-
-        return HUrl::instance($url)->withQueryArray([])->toString();
-    }
-
-    /**
-     * @throws OssException
-     */
-    public function authUploadUrl(
-        $path,
-        $timeout = 60,
-        $method = OssClient::OSS_HTTP_PUT,
-        Options $config = null
-    ): string {
-        if (HUrl::isUrlString($path)) {
-            $url = $path;
-        } else {
-            $url = sprintf(
-                '%s/%s',
-                rtrim(($this->getUploadBaseUrl() ?: ''), '/'),
-                ltrim($this->makePath($path, $config), '/')
-            );
-        }
-
-        return $this->authUrl(ltrim($url, '/'), $timeout, $method, $config);
+        return $this->cdnUrl($path) ?? $this->url($path);
     }
 
     /**
      * @throws GuzzleException
      */
-    public function putUrl($url, $path, Options $config = null)
+    public function writeFromUrl(string $url, string $path): string
     {
-        $config = $config ?? new Options();
-        $response = $this->getHttpClient()->get($url, $config->get('http', []));
+        $response = $this->getHttpClient()->get($url, ['stream' => true]);
 
-        $this->getOssClient()->putObject(
-            $this->getBucket(),
-            ltrim($this->makePath($path, $config), '/'),
-            $response->getBody()->getContents(),
-            $config->get('options')
+        $this->client()->putObject(
+            new Oss\Models\PutObjectRequest(
+                bucket: $this->bucket(),
+                key: $this->resolveKey($path),
+                body: $response->getBody(),
+            )
+        );
+
+        return $this->cdnUrl($path) ?? $this->url($path);
+    }
+
+    /**
+     * URL 变化时才上传（微信头像场景）
+     */
+    public function mirrorIfChanged(mixed $sourceUrl, mixed $existingUrl, string $prefix = ''): ?string
+    {
+        $source = Url::parse($sourceUrl);
+        $existing = Url::parse($existingUrl);
+
+        if (!$source instanceof Url) {
+            return $existing instanceof Url ? $existing->toString() : null;
+        }
+
+        if ($existing instanceof Url && Str::contains($existing->getPath(), $source->getPath())) {
+            return $existing->toString();
+        }
+
+        $path = trim(sprintf('/%s/%s', trim($prefix, '/'), trim($source->getPath(), '/')), '/');
+
+        return $this->writeFromUrl($sourceUrl, $path);
+    }
+
+    public function download(string $path, string $file): void
+    {
+        $this->client()->getObjectToFile(
+            new Oss\Models\GetObjectRequest(bucket: $this->bucket(), key: $this->resolveKey($path)),
+            $file
         );
     }
 
-    /**
-     * @throws GuzzleException
-     * @throws OssException
-     */
-    public function putUrlAndReturnUrl($url, $path, Options $config = null): string
+    public function symlink(string $link, string $target): void
     {
-        $this->putUrl($url, $path, $config);
-
-        return $this->cdnUrl($path) ?: $this->url($path);
-    }
-
-    /**
-     * 一般用于保存用户微信头像到DB的场景, 如果文件未发生变化不上传(仅通过url判断).
-     *
-     * @param mixed $cfile 需要上传的url
-     * @param mixed $dfile db的url
-     * @param string $prefix
-     * @param Options|null $config
-     *
-     * @return string|null
-     * @throws GuzzleException
-     *
-     * @throws OssException
-     */
-    public function putUrlIfChangeUrl(
-        mixed $cfile,
-        mixed $dfile,
-        string $prefix = '',
-        Options $config = null
-    ): null|string {
-        $cUrl = Url::parse($cfile);
-        $dUrl = Url::parse($dfile);
-
-        /** 需要上传的url不是正确的url(微信头像为空), 直接返回db的记录 */
-        if (!$cUrl instanceof Url) {
-            return $dUrl instanceof Url ? $dUrl->toString() : null;
-        }
-
-        /** db里面的文件路径包含需要上传的url path部分, 说明已经上传了无需更改 */
-        if ($dUrl instanceof Url && Str::contains($dUrl->getPath(), $cUrl->getPath())) {
-            return $dUrl->toString();
-        }
-
-        $path = trim(sprintf('/%s/%s', trim($prefix, '/'), trim($cUrl->getPath(), '/')), '/');
-
-        return $this->putUrlAndReturnUrl($cfile, $path, $config);
-    }
-
-    public function putFile($file, string $path, Options $config = null)
-    {
-        $config = $config ?? new Options();
-
-        $this->getOssClient()->putObject(
-            $this->getBucket(),
-            ltrim($this->makePath($path, $config), '/'),
-            file_get_contents($file),
-            $config->get('options')
+        $this->client()->putSymlink(
+            new Oss\Models\PutSymlinkRequest(
+                bucket: $this->bucket(),
+                key: $this->resolveKey($link),
+                target: $this->resolveKey($target),
+            )
         );
     }
 
-    /**
-     * 创建软连接
-     */
-    public function createSymlink($symlink, $target, Options $config = null)
-    {
-        $config = $config ?? new Options();
+    // ==================== 工具 ====================
 
-        $this->getOssClient()->putSymlink(
-            $this->getBucket(),
-            ltrim($this->makePath($symlink, $config), '/'),
-            ltrim($this->makePath($target, $config), '/'),
-            $config->get('options')
-        );
-    }
-
-    /**
-     * @throws OssException
-     */
-    public function putFileAndReturnUrl($file, string $path, Options $config = null): string
-    {
-        $this->putFile($file, $path, $config);
-
-        return $this->cdnUrl($path, $config) ?: $this->url($path, $config);
-    }
-
-    public function download($path, $file, Options $config = null)
-    {
-        $config = $config ?? new Options();
-
-        $this->getOssClient()->getObject(
-            $this->getBucket(),
-            ltrim($this->makePath($path, $config), '/'),
-            array_merge($config->get('options', []), [OssClient::OSS_FILE_DOWNLOAD => $file])
-        );
-    }
-
-    public function isBucketUrl($url): bool
-    {
-        $url = Url::parse($url);
-        if (!$url instanceof Url) {
-            return false;
-        }
-
-        $domains = array_filter([
-            $this->getCdnBaseUrl(),
-            $this->getUploadBaseUrl(),
-            $this->getOssOriginalDomain(),
-            $this->getOssOriginalDomain(true),
-        ]);
-
-        foreach ($domains as $domain) {
-            $domainHost = HUrl::parse($domain)?->getHost() ?: $domain;
-            if ($url->getHost() === $domainHost) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @deprecated 使用 isValidUrl($url, false, true) 代替
-     */
-    public function hasUrl($url): bool
-    {
-        return $this->isValidUrl($url, false, true);
-    }
-
-    /**
-     * 验证 URL 是否是有效的 OSS 文件地址
-     *
-     * @param mixed $url 要验证的 URL
-     * @param bool $checkBucketDomain 是否检查域名归属
-     * @param bool $checkFileExists 是否检查文件存在
-     * @return bool
-     */
-    public function isValidUrl($url, bool $checkBucketDomain = true, bool $checkFileExists = true): bool
-    {
-        if (!HUrl::isUrlString($url)) {
-            return false;
-        }
-
-        if ($checkBucketDomain && !$this->isBucketUrl($url)) {
-            return false;
-        }
-
-        if ($checkFileExists) {
-            $path = ltrim(HUrl::parse($url)?->getPath() ?? '', '/');
-            if (empty($path)) {
-                return false;
-            }
-
-            try {
-                $this->getObjectMeta($this->getBucket(), $path);
-            } catch (OssException $exception) {
-                // 404 表示文件不存在
-                if ((int) $exception->getHTTPStatus() === 404) {
-                    return false;
-                }
-                throw $exception;
-            }
-        }
-
-        return true;
-    }
-
-    public static function base64EncodeWatermarkText($text): string
+    public static function watermarkText(string $text): string
     {
         return rtrim(strtr(base64_encode($text), ['+' => '-', '/' => '_']));
     }
 
-    /**
-     * Pass dynamic methods call onto oss.
-     *
-     * @param string $method
-     * @param array $parameters
-     *
-     * @return mixed
-     * @throws BadMethodCallException
-     *
-     */
-    public function __call(string $method, array $parameters)
+    // ==================== 内部方法 ====================
+
+    private function resolveKey(string $path): string
     {
-        return $this->getOssClient()->{$method}(...$parameters);
+        return ltrim($this->prefixer()->prefixPath($path), '/');
+    }
+
+    private function defaultAcl(): string
+    {
+        if (!empty($this->config['acl'])) {
+            return $this->config['acl'];
+        }
+
+        $result = $this->client()->getBucketAcl(
+            new Oss\Models\GetBucketAclRequest(bucket: $this->bucket())
+        );
+
+        return $result->accessControlList->grant ?? Acl::OSS_ACL_TYPE_PRIVATE;
+    }
+
+    private function matchUrlHost(string $url, ?string $domain): bool
+    {
+        if ($domain === null) {
+            return false;
+        }
+
+        $urlObj = HUrl::parse($url);
+        return $urlObj instanceof HUrl && $urlObj->getHost() === $domain;
+    }
+
+    private function convertUrlToDomain(string $url, ?string $domain, ?string $baseUrl): ?string
+    {
+        if ($domain === null) {
+            return null;
+        }
+
+        $urlObj = HUrl::parse($url);
+        if (!$urlObj instanceof HUrl) {
+            return null;
+        }
+
+        $scheme = 'https';
+        if ($baseUrl !== null) {
+            $baseUrlObj = HUrl::parse($baseUrl);
+            if ($baseUrlObj instanceof HUrl) {
+                $scheme = $baseUrlObj->getScheme();
+            }
+        }
+
+        return $urlObj->withHost($domain)->withScheme($scheme)->toString();
     }
 }

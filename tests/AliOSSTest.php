@@ -10,17 +10,15 @@ class AliOSSTest extends TestCase
 {
     public function testGetClient(): void
     {
-        $adapter = AliOSS::getClient('oss');
-        $this->assertInstanceOf(OssAdapter::class, $adapter);
+        $this->assertInstanceOf(OssAdapter::class, AliOSS::getClient('oss'));
     }
 
     public function testGetClientWithDefaultDisk(): void
     {
-        $adapter = AliOSS::getClient();
-        $this->assertInstanceOf(OssAdapter::class, $adapter);
+        $this->assertInstanceOf(OssAdapter::class, AliOSS::getClient());
     }
 
-    public function testGetClientThrowsExceptionForNonOssDisk(): void
+    public function testGetClientThrowsForNonOssDisk(): void
     {
         $this->app['config']->set('filesystems.disks.local', [
             'driver' => 'local',
@@ -31,36 +29,13 @@ class AliOSSTest extends TestCase
         AliOSS::getClient('local');
     }
 
-    public function testBase64EncodeWatermarkText(): void
+    public function testWatermarkText(): void
     {
         $text = 'Hello World';
-        $encoded = AliOSS::base64EncodeWatermarkText($text);
-
+        $encoded = AliOSS::watermarkText($text);
         $this->assertStringNotContainsString('+', $encoded);
         $this->assertStringNotContainsString('/', $encoded);
-
         $decoded = base64_decode(strtr($encoded, ['-' => '+', '_' => '/']));
         $this->assertSame($text, $decoded);
-    }
-
-    public function testStaticCallForwarding(): void
-    {
-        $bucket = AliOSS::getBucket();
-        $this->assertNotEmpty($bucket);
-
-        $prefixer = AliOSS::getPrefixer();
-        $this->assertNotNull($prefixer);
-    }
-
-    public function testIsBucketUrlViaFacade(): void
-    {
-        $adapter = $this->getOssAdapter();
-        $cdnBaseUrl = $adapter->getCdnBaseUrl();
-
-        if ($cdnBaseUrl) {
-            $this->assertTrue(AliOSS::isBucketUrl($cdnBaseUrl . '/test.jpg'));
-        }
-
-        $this->assertFalse(AliOSS::isBucketUrl('https://other.example.com/file.jpg'));
     }
 }

@@ -1,10 +1,4 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: hugh.li
- * Date: 2021/4/18
- * Time: 10:32 下午.
- */
 
 namespace HughCube\Laravel\AliOSS;
 
@@ -15,10 +9,7 @@ use League\Flysystem\Filesystem;
 
 class ServiceProvider extends IlluminateServiceProvider
 {
-    /**
-     * Boot the provider.
-     */
-    public function boot()
+    public function boot(): void
     {
         Storage::extend('alioss', function ($app, $config) {
             $adapter = new OssAdapter($config);

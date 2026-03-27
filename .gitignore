@@ -11,3 +11,4 @@ phpunit.xml
 .env
 .phpunit.cache/
 test_*.txt
+/docs/

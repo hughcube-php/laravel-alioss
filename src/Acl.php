@@ -1,36 +1,26 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: hugh.li
- * Date: 2022/3/24
- * Time: 18:21.
- */
 
 namespace HughCube\Laravel\AliOSS;
 
-use JetBrains\PhpStorm\ArrayShape;
-use JetBrains\PhpStorm\Pure;
 use League\Flysystem\Visibility;
-use OSS\OssClient;
 
 class Acl
 {
-    const OSS_ACL_TYPE_PUBLIC_READ = OssClient::OSS_ACL_TYPE_PUBLIC_READ;
-    const OSS_ACL_TYPE_PUBLIC_READ_WRITE = OssClient::OSS_ACL_TYPE_PUBLIC_READ_WRITE;
-    const OSS_ACL_TYPE_PRIVATE = OssClient::OSS_ACL_TYPE_PRIVATE;
+    const OSS_ACL_TYPE_PUBLIC_READ = 'public-read';
+    const OSS_ACL_TYPE_PUBLIC_READ_WRITE = 'public-read-write';
+    const OSS_ACL_TYPE_PRIVATE = 'private';
+    const OSS_ACL_TYPE_DEFAULT = 'default';
 
-    #[ArrayShape([])]
     public static function getAclMap(): array
     {
         return [
-            OssClient::OSS_ACL_TYPE_PUBLIC_READ       => Visibility::PUBLIC,
-            OssClient::OSS_ACL_TYPE_PUBLIC_READ_WRITE => Visibility::PUBLIC,
-            OssClient::OSS_ACL_TYPE_PRIVATE           => Visibility::PRIVATE,
+            self::OSS_ACL_TYPE_PUBLIC_READ       => Visibility::PUBLIC,
+            self::OSS_ACL_TYPE_PUBLIC_READ_WRITE => Visibility::PUBLIC,
+            self::OSS_ACL_TYPE_PRIVATE           => Visibility::PRIVATE,
         ];
     }
 
-    #[Pure]
-    public static function toAcl($visibility): int|string
+    public static function toAcl($visibility): string
     {
         foreach (static::getAclMap() as $a => $v) {
             if ($visibility === $v) {
@@ -38,11 +28,10 @@ class Acl
             }
         }
 
-        return static::OSS_ACL_TYPE_PRIVATE;
+        return self::OSS_ACL_TYPE_PRIVATE;
     }
 
-    #[Pure]
-    public static function toVisibility($acl)
+    public static function toVisibility($acl): string
     {
         foreach (static::getAclMap() as $a => $v) {
             if ($acl === $a) {

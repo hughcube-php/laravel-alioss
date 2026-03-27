@@ -12,7 +12,7 @@
         "php": ">=8.0",
         "illuminate/filesystem": "*",
         "league/flysystem": "*",
-        "aliyuncs/oss-sdk-php": "*",
+        "alibabacloud/oss-v2": "^0.4",
         "hughcube/purl": "*",
         "hughcube/guzzle-http": "*"
     },

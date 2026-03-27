@@ -2,6 +2,7 @@
 
 namespace HughCube\Laravel\AliOSS\Tests;
 
+use AlibabaCloud\Oss\V2 as Oss;
 use HughCube\Laravel\AliOSS\OssAdapter;
 use HughCube\Laravel\AliOSS\ServiceProvider;
 use Illuminate\Filesystem\FilesystemAdapter;
@@ -15,24 +16,17 @@ class ServiceProviderTest extends TestCase
         $this->assertArrayHasKey(ServiceProvider::class, $providers);
     }
 
-    public function testAliossDriverIsExtended(): void
-    {
-        $disk = Storage::disk('oss');
-        $this->assertInstanceOf(FilesystemAdapter::class, $disk);
-    }
-
     public function testAliossDriverReturnsOssAdapter(): void
     {
         $disk = Storage::disk('oss');
-        $adapter = $disk->getAdapter();
-        $this->assertInstanceOf(OssAdapter::class, $adapter);
+        $this->assertInstanceOf(FilesystemAdapter::class, $disk);
+        $this->assertInstanceOf(OssAdapter::class, $disk->getAdapter());
     }
 
     public function testConfigurationIsPassedToAdapter(): void
     {
         $adapter = $this->getOssAdapter();
-
-        $this->assertNotEmpty($adapter->getBucket());
-        $this->assertNotNull($adapter->getOssClient());
+        $this->assertNotEmpty($adapter->bucket());
+        $this->assertInstanceOf(Oss\Client::class, $adapter->client());
     }
 }
