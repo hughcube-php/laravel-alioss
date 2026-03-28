@@ -84,10 +84,22 @@ class OssFile implements ValidationRule
         return $this;
     }
 
-    public function image(): static { return $this->mimeTypes(['image/*']); }
-    public function video(): static { return $this->mimeTypes(['video/*']); }
-    public function audio(): static { return $this->mimeTypes(['audio/*']); }
-    public function media(): static { return $this->mimeTypes(['image/*', 'video/*', 'audio/*']); }
+    public function image(): static
+    {
+        return $this->mimeTypes(['image/*']);
+    }
+    public function video(): static
+    {
+        return $this->mimeTypes(['video/*']);
+    }
+    public function audio(): static
+    {
+        return $this->mimeTypes(['audio/*']);
+    }
+    public function media(): static
+    {
+        return $this->mimeTypes(['image/*', 'video/*', 'audio/*']);
+    }
 
     public function document(): static
     {
@@ -104,7 +116,10 @@ class OssFile implements ValidationRule
         ]);
     }
 
-    public function pdf(): static { return $this->mimeTypes(['application/pdf']); }
+    public function pdf(): static
+    {
+        return $this->mimeTypes(['application/pdf']);
+    }
 
     public function word(): static
     {
@@ -143,8 +158,14 @@ class OssFile implements ValidationRule
         ]);
     }
 
-    public function text(): static { return $this->mimeTypes(['text/*']); }
-    public function json(): static { return $this->mimeTypes(['application/json']); }
+    public function text(): static
+    {
+        return $this->mimeTypes(['text/*']);
+    }
+    public function json(): static
+    {
+        return $this->mimeTypes(['application/json']);
+    }
 
     public function xml(): static
     {
@@ -300,10 +321,22 @@ class OssFile implements ValidationRule
 
     // ==================== 查询方法 ====================
 
-    public function fileAttributes(): ?FileAttributes { return $this->fileAttrs; }
-    public function fileSize(): ?int { return $this->fileAttrs?->fileSize(); }
-    public function mimeType(): ?string { return $this->fileAttrs?->mimeType(); }
-    public function path(): ?string { return $this->parsedPath; }
+    public function fileAttributes(): ?FileAttributes
+    {
+        return $this->fileAttrs;
+    }
+    public function fileSize(): ?int
+    {
+        return $this->fileAttrs?->fileSize();
+    }
+    public function mimeType(): ?string
+    {
+        return $this->fileAttrs?->mimeType();
+    }
+    public function path(): ?string
+    {
+        return $this->parsedPath;
+    }
 
     public function filename(): ?string
     {
@@ -320,11 +353,26 @@ class OssFile implements ValidationRule
         return $this->parsedPath !== null ? pathinfo($this->parsedPath, PATHINFO_DIRNAME) : null;
     }
 
-    public function domainType(): ?string { return $this->detectedDomain; }
-    public function failedReason(): ?string { return $this->failReason; }
-    public function isCdnDomain(): bool { return $this->detectedDomain === OssAdapter::DOMAIN_CDN; }
-    public function isUploadDomain(): bool { return $this->detectedDomain === OssAdapter::DOMAIN_UPLOAD; }
-    public function isOssDomain(): bool { return $this->detectedDomain === OssAdapter::DOMAIN_OSS; }
+    public function domainType(): ?string
+    {
+        return $this->detectedDomain;
+    }
+    public function failedReason(): ?string
+    {
+        return $this->failReason;
+    }
+    public function isCdnDomain(): bool
+    {
+        return $this->detectedDomain === OssAdapter::DOMAIN_CDN;
+    }
+    public function isUploadDomain(): bool
+    {
+        return $this->detectedDomain === OssAdapter::DOMAIN_UPLOAD;
+    }
+    public function isOssDomain(): bool
+    {
+        return $this->detectedDomain === OssAdapter::DOMAIN_OSS;
+    }
 
     // ==================== 内部方法 ====================
 
@@ -509,18 +557,30 @@ class OssFile implements ValidationRule
 
     protected function detectDomain(OssAdapter $adapter, string $url): ?string
     {
-        if ($adapter->isCdnUrl($url)) return OssAdapter::DOMAIN_CDN;
-        if ($adapter->isUploadUrl($url)) return OssAdapter::DOMAIN_UPLOAD;
-        if ($adapter->isOssUrl($url)) return OssAdapter::DOMAIN_OSS;
-        if ($adapter->isOssInternalUrl($url)) return OssAdapter::DOMAIN_OSS_INTERNAL;
+        if ($adapter->isCdnUrl($url)) {
+            return OssAdapter::DOMAIN_CDN;
+        }
+        if ($adapter->isUploadUrl($url)) {
+            return OssAdapter::DOMAIN_UPLOAD;
+        }
+        if ($adapter->isOssUrl($url)) {
+            return OssAdapter::DOMAIN_OSS;
+        }
+        if ($adapter->isOssInternalUrl($url)) {
+            return OssAdapter::DOMAIN_OSS_INTERNAL;
+        }
         return null;
     }
 
     protected function matchMimeType(string $mimeType, array $allowed): bool
     {
         foreach ($allowed as $pattern) {
-            if ($mimeType === $pattern) return true;
-            if (str_ends_with($pattern, '/*') && str_starts_with($mimeType, substr($pattern, 0, -1))) return true;
+            if ($mimeType === $pattern) {
+                return true;
+            }
+            if (str_ends_with($pattern, '/*') && str_starts_with($mimeType, substr($pattern, 0, -1))) {
+                return true;
+            }
         }
         return false;
     }

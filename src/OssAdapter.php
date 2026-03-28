@@ -748,5 +748,4 @@ class OssAdapter implements FilesystemAdapter
         $urlObj = HUrl::parse($url);
         return $urlObj instanceof HUrl && $urlObj->getHost() === $domain;
     }
-
 }
