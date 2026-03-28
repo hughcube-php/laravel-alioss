@@ -683,4 +683,50 @@ class OssUrlTest extends TestCase
         $this->assertStringContainsString('token=abc', $str);
         $this->assertStringContainsString('x-oss-process=image/resize', $str);
     }
+
+    // ==================== 数据操作（key 提取） ====================
+
+    public function testKey(): void
+    {
+        $url = $this->makeUrl('https://cdn.example.com/path/to/file.jpg');
+        $this->assertSame('path/to/file.jpg', $url->key());
+    }
+
+    public function testKeyWithLeadingSlash(): void
+    {
+        $url = $this->makeUrl('https://cdn.example.com/file.jpg');
+        $this->assertSame('file.jpg', $url->key());
+    }
+
+    public function testFetchWithoutAdapterThrows(): void
+    {
+        $url = \HughCube\Laravel\AliOSS\OssUrl::parse('https://example.com/file.jpg');
+        $this->expectException(\BadMethodCallException::class);
+        $url->fetch();
+    }
+
+    public function testDownloadWithoutAdapterThrows(): void
+    {
+        $url = \HughCube\Laravel\AliOSS\OssUrl::parse('https://example.com/file.jpg');
+        $this->expectException(\BadMethodCallException::class);
+        $url->download('/tmp/test.txt');
+    }
+
+    public function testFetchAttributesWithoutAdapterReturnsNull(): void
+    {
+        $url = \HughCube\Laravel\AliOSS\OssUrl::parse('https://example.com/file.jpg');
+        $this->assertNull($url->fetchAttributes());
+    }
+
+    public function testFetchImageInfoWithoutAdapterReturnsNull(): void
+    {
+        $url = \HughCube\Laravel\AliOSS\OssUrl::parse('https://example.com/file.jpg');
+        $this->assertNull($url->fetchImageInfo());
+    }
+
+    public function testExistsWithoutAdapterReturnsFalse(): void
+    {
+        $url = \HughCube\Laravel\AliOSS\OssUrl::parse('https://example.com/file.jpg');
+        $this->assertFalse($url->exists());
+    }
 }

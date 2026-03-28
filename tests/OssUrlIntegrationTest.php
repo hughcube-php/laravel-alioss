@@ -375,6 +375,81 @@ class OssUrlIntegrationTest extends TestCase
         $this->assertStringContainsString('x-oss-process', (string) $modified);
     }
 
+    // ==================== 数据操作 ====================
+
+    public function testFetch(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $url = $adapter->ossUrl(self::$textPath);
+
+        $this->assertSame('Hello OSS URL Integration Test', $url->fetch());
+    }
+
+    public function testDownload(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $url = $adapter->ossUrl(self::$textPath);
+        $tmpFile = sys_get_temp_dir() . '/' . Str::random(16) . '.txt';
+
+        try {
+            $url->download($tmpFile);
+            $this->assertSame('Hello OSS URL Integration Test', file_get_contents($tmpFile));
+        } finally {
+            if (file_exists($tmpFile)) {
+                unlink($tmpFile);
+            }
+        }
+    }
+
+    public function testFetchAttributes(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $url = $adapter->ossUrl(self::$textPath);
+        $attrs = $url->fetchAttributes();
+
+        $this->assertNotNull($attrs);
+        $this->assertGreaterThan(0, $attrs->fileSize());
+        $this->assertNotNull($attrs->mimeType());
+    }
+
+    public function testFetchAttributesReturnsNullForNonExistent(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $url = $adapter->ossUrl($this->testPath('nonexistent-' . Str::random(16) . '.txt'));
+
+        $this->assertNull($url->fetchAttributes());
+    }
+
+    public function testFetchImageInfo(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $url = $adapter->ossUrl(self::$imagePath);
+        $info = $url->fetchImageInfo();
+
+        $this->assertNotNull($info);
+        $this->assertArrayHasKey('ImageWidth', $info);
+        $this->assertArrayHasKey('ImageHeight', $info);
+        $this->assertSame('100', $info['ImageWidth']['value']);
+        $this->assertSame('100', $info['ImageHeight']['value']);
+    }
+
+    public function testFetchImageInfoReturnsNullForNonImage(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $url = $adapter->ossUrl(self::$textPath);
+
+        $this->assertNull($url->fetchImageInfo());
+    }
+
+    public function testExists(): void
+    {
+        $adapter = $this->getOssAdapter();
+
+        $this->assertTrue($adapter->ossUrl(self::$imagePath)->exists());
+        $this->assertTrue($adapter->ossUrl(self::$textPath)->exists());
+        $this->assertFalse($adapter->ossUrl($this->testPath('nonexistent-' . Str::random(16)))->exists());
+    }
+
     // ==================== 辅助方法 ====================
 
     private function createTestPng(): string

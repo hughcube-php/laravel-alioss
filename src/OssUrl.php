@@ -126,6 +126,76 @@ class OssUrl extends HUrl
         return ltrim($this->getPath(), '/');
     }
 
+    // ==================== 数据操作 ====================
+
+    /**
+     * 读取文件内容。
+     *
+     * @return string 文件内容
+     * @throws \InvalidArgumentException
+     */
+    public function fetch(): string
+    {
+        if ($this->adapter === null) {
+            throw new \BadMethodCallException('OssUrl has no adapter bound.');
+        }
+
+        return $this->adapter->fetch('/' . $this->key());
+    }
+
+    /**
+     * 下载文件到本地。
+     *
+     * @param string $file 本地保存路径
+     * @throws \InvalidArgumentException
+     */
+    public function download(string $file): void
+    {
+        if ($this->adapter === null) {
+            throw new \BadMethodCallException('OssUrl has no adapter bound.');
+        }
+
+        $this->adapter->download('/' . $this->key(), $file);
+    }
+
+    /**
+     * 获取文件属性（大小、MIME、最后修改时间）。
+     *
+     * 文件不存在返回 null 而非抛异常。
+     *
+     * @return \League\Flysystem\FileAttributes|null
+     */
+    public function fetchAttributes(): ?\League\Flysystem\FileAttributes
+    {
+        return $this->adapter?->fetchAttributes('/' . $this->key());
+    }
+
+    /**
+     * 获取图片元信息（ImageWidth、ImageHeight、Format、FileSize 等）。
+     *
+     * 文件不存在或非图片返回 null。
+     *
+     * @return array|null
+     */
+    public function fetchImageInfo(): ?array
+    {
+        return $this->adapter?->fetchImageInfo('/' . $this->key());
+    }
+
+    /**
+     * 检测文件是否存在。
+     *
+     * @return bool
+     */
+    public function exists(): bool
+    {
+        if ($this->adapter === null) {
+            return false;
+        }
+
+        return $this->adapter->fetchAttributes('/' . $this->key()) !== null;
+    }
+
     // ==================== 域名识别 ====================
 
     /**

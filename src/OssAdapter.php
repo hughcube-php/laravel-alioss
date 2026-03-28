@@ -626,7 +626,7 @@ class OssAdapter implements FilesystemAdapter
             return is_array($data) ? $data : null;
         } catch (Oss\Exception\OperationException $e) {
             $prev = $e->getPrevious();
-            if ($prev instanceof Oss\Exception\ServiceException && $prev->getStatusCode() === 404) {
+            if ($prev instanceof Oss\Exception\ServiceException && in_array($prev->getStatusCode(), [400, 404], true)) {
                 return null;
             }
             throw $e;
