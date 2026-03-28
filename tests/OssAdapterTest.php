@@ -17,14 +17,48 @@ class OssAdapterTest extends TestCase
     public function testTestPathPrefixIsReadWritable(): void
     {
         $adapter = $this->getOssAdapter();
+        $prefix = env('ALIOSS_TEST_PATH_PREFIX', 'Test/LaravelAlioss/GitHubActions');
         $path = $this->testPath('rw-check-' . Str::random(8) . '.txt');
 
         try {
             $adapter->write($path, 'rw-check');
+        } catch (\Throwable $e) {
+            $this->fail("无法写入测试目录 '{$prefix}'，请检查 OSS 凭据和 RAM 权限配置: {$e->getMessage()}");
+        }
+
+        try {
             $this->assertTrue($adapter->fileExists($path));
             $this->assertSame('rw-check', $adapter->read($path));
         } finally {
             $adapter->delete($path);
+        }
+    }
+
+    /**
+     * 验证凭据不能写入测试目录之外的路径，确保 RAM 权限最小化。
+     */
+    public function testCannotWriteOutsideTestPath(): void
+    {
+        $adapter = $this->getOssAdapter();
+
+        $outsidePaths = [
+            'unauthorized/' . Str::random(16) . '.txt',
+            Str::random(16) . '.txt',
+            'tmp/' . Str::random(16) . '.txt',
+        ];
+
+        foreach ($outsidePaths as $path) {
+            try {
+                $adapter->write($path, 'should-fail');
+                // 如果没抛异常，说明写入成功了——权限过大，清理后报错
+                try {
+                    $adapter->delete($path);
+                } catch (\Throwable $e) {
+                }
+                $this->fail("不应该能写入测试目录之外的路径 '{$path}'，请收紧 RAM 权限");
+            } catch (\AlibabaCloud\Oss\V2\Exception\OperationException $e) {
+                $this->assertTrue(true);
+            }
         }
     }
 
