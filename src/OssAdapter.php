@@ -82,12 +82,12 @@ class OssAdapter implements FilesystemAdapter
         return ($this->config['region'] ?? null) ?: null;
     }
 
-    protected function accessKeyId(): string
+    public function accessKeyId(): string
     {
         return $this->config['accessKeyId'];
     }
 
-    protected function accessKeySecret(): string
+    public function accessKeySecret(): string
     {
         return $this->config['accessKeySecret'];
     }
