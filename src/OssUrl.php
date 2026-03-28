@@ -782,7 +782,13 @@ class OssUrl extends HUrl
      *
      * @see https://help.aliyun.com/zh/oss/user-guide/video-snapshots
      */
-    public function videoSnapshot(int $timeMs, ?int $width = null, ?int $height = null, string $format = 'jpg', ?string $mode = null): static
+    public function videoSnapshot(
+        int $timeMs,
+        ?int $width = null,
+        ?int $height = null,
+        string $format = 'jpg',
+        ?string $mode = null
+    ): static
     {
         $params = "t_{$timeMs},f_{$format}";
         if ($width !== null) {
@@ -872,7 +878,13 @@ class OssUrl extends HUrl
      * @param float|null $fps 帧率
      * @return static
      */
-    public function videoGif(int $startMs, int $durationMs, ?int $width = null, ?int $height = null, ?float $fps = null): static
+    public function videoGif(
+        int $startMs,
+        int $durationMs,
+        ?int $width = null,
+        ?int $height = null,
+        ?float $fps = null
+    ): static
     {
         $params = "ss_{$startMs},t_{$durationMs}";
         if ($width !== null) {
