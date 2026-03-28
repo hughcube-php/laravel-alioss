@@ -5,3 +5,4 @@ parameters:
         - src
     inferPrivatePropertyTypeFromConstructor: true
     ignoreErrors:
+        - identifier: new.static
