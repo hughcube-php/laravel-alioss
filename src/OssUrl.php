@@ -788,8 +788,7 @@ class OssUrl extends HUrl
         ?int $height = null,
         string $format = 'jpg',
         ?string $mode = null
-    ): static
-    {
+    ): static {
         $params = "t_{$timeMs},f_{$format}";
         if ($width !== null) {
             $params .= ",w_{$width}";
@@ -884,8 +883,7 @@ class OssUrl extends HUrl
         ?int $width = null,
         ?int $height = null,
         ?float $fps = null
-    ): static
-    {
+    ): static {
         $params = "ss_{$startMs},t_{$durationMs}";
         if ($width !== null) {
             $params .= ",w_{$width}";
