@@ -541,7 +541,7 @@ class OssAdapter implements FilesystemAdapter
      * @param string|UriInterface $pathOrUrl OSS path、URL 字符串或 UriInterface 对象
      * @param string $file 本地保存路径
      */
-    public function download($pathOrUrl, string $file): void
+    public function download($pathOrUrl, string $file, ?int $timeout = null): void
     {
         $key = $this->resolveAny($pathOrUrl);
         if ($key === null || $key === '') {
@@ -550,7 +550,8 @@ class OssAdapter implements FilesystemAdapter
 
         $this->client()->getObjectToFile(
             new Oss\Models\GetObjectRequest(bucket: $this->bucket(), key: $key),
-            $file
+            $file,
+            $this->buildRequestOptions($timeout)
         );
     }
 
@@ -563,7 +564,7 @@ class OssAdapter implements FilesystemAdapter
      * @param string|UriInterface $pathOrUrl OSS path、URL 字符串或 UriInterface 对象
      * @return string 文件内容
      */
-    public function fetch($pathOrUrl): string
+    public function fetch($pathOrUrl, ?int $timeout = null): string
     {
         $key = $this->resolveAny($pathOrUrl);
         if ($key === null || $key === '') {
@@ -571,7 +572,8 @@ class OssAdapter implements FilesystemAdapter
         }
 
         $result = $this->client()->getObject(
-            new Oss\Models\GetObjectRequest(bucket: $this->bucket(), key: $key)
+            new Oss\Models\GetObjectRequest(bucket: $this->bucket(), key: $key),
+            $this->buildRequestOptions($timeout)
         );
 
         return $result->body->getContents();
@@ -605,7 +607,7 @@ class OssAdapter implements FilesystemAdapter
      * @param string|UriInterface $pathOrUrl OSS path、URL 字符串或 UriInterface 对象
      * @return array|null
      */
-    public function fetchImageInfo($pathOrUrl): ?array
+    public function fetchImageInfo($pathOrUrl, ?int $timeout = null): ?array
     {
         $key = $this->resolveAny($pathOrUrl);
         if ($key === null) {
@@ -618,7 +620,8 @@ class OssAdapter implements FilesystemAdapter
                     bucket: $this->bucket(),
                     key: $key,
                     process: 'image/info',
-                )
+                ),
+                $this->buildRequestOptions($timeout)
             );
 
             $data = json_decode($result->body->getContents(), true);
@@ -642,7 +645,7 @@ class OssAdapter implements FilesystemAdapter
      * @param string|UriInterface $pathOrUrl OSS path、URL 字符串或 UriInterface 对象
      * @return FileAttributes|null
      */
-    public function fetchAttributes($pathOrUrl): ?FileAttributes
+    public function fetchAttributes($pathOrUrl, ?int $timeout = null): ?FileAttributes
     {
         $key = $this->resolveAny($pathOrUrl);
         if ($key === null) {
@@ -651,7 +654,8 @@ class OssAdapter implements FilesystemAdapter
 
         try {
             $result = $this->client()->headObject(
-                new Oss\Models\HeadObjectRequest(bucket: $this->bucket(), key: $key)
+                new Oss\Models\HeadObjectRequest(bucket: $this->bucket(), key: $key),
+                $this->buildRequestOptions($timeout)
             );
 
             return new FileAttributes(
@@ -678,6 +682,21 @@ class OssAdapter implements FilesystemAdapter
     }
 
     // ==================== 内部方法 ====================
+
+    private function buildRequestOptions(?int $timeout): array
+    {
+        if ($timeout === null) {
+            return [];
+        }
+
+        return [
+            'request_options' => [
+                'connect_timeout' => $timeout,
+                'read_timeout' => $timeout,
+                'timeout' => $timeout,
+            ],
+        ];
+    }
 
     private function resolveKey(string $path): string
     {

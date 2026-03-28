@@ -131,31 +131,31 @@ class OssUrl extends HUrl
     /**
      * 读取文件内容。
      *
+     * @param int|null $timeout 超时秒数，null 使用 SDK 默认配置
      * @return string 文件内容
-     * @throws \InvalidArgumentException
      */
-    public function fetch(): string
+    public function fetch(?int $timeout = null): string
     {
         if ($this->adapter === null) {
             throw new \BadMethodCallException('OssUrl has no adapter bound.');
         }
 
-        return $this->adapter->fetch('/' . $this->key());
+        return $this->adapter->fetch('/' . $this->key(), $timeout);
     }
 
     /**
      * 下载文件到本地。
      *
      * @param string $file 本地保存路径
-     * @throws \InvalidArgumentException
+     * @param int|null $timeout 超时秒数，null 使用 SDK 默认配置
      */
-    public function download(string $file): void
+    public function download(string $file, ?int $timeout = null): void
     {
         if ($this->adapter === null) {
             throw new \BadMethodCallException('OssUrl has no adapter bound.');
         }
 
-        $this->adapter->download('/' . $this->key(), $file);
+        $this->adapter->download('/' . $this->key(), $file, $timeout);
     }
 
     /**
@@ -163,11 +163,12 @@ class OssUrl extends HUrl
      *
      * 文件不存在返回 null 而非抛异常。
      *
+     * @param int|null $timeout 超时秒数，null 使用 SDK 默认配置
      * @return \League\Flysystem\FileAttributes|null
      */
-    public function fetchAttributes(): ?\League\Flysystem\FileAttributes
+    public function fetchAttributes(?int $timeout = null): ?\League\Flysystem\FileAttributes
     {
-        return $this->adapter?->fetchAttributes('/' . $this->key());
+        return $this->adapter?->fetchAttributes('/' . $this->key(), $timeout);
     }
 
     /**
@@ -175,25 +176,27 @@ class OssUrl extends HUrl
      *
      * 文件不存在或非图片返回 null。
      *
+     * @param int|null $timeout 超时秒数，null 使用 SDK 默认配置
      * @return array|null
      */
-    public function fetchImageInfo(): ?array
+    public function fetchImageInfo(?int $timeout = null): ?array
     {
-        return $this->adapter?->fetchImageInfo('/' . $this->key());
+        return $this->adapter?->fetchImageInfo('/' . $this->key(), $timeout);
     }
 
     /**
      * 检测文件是否存在。
      *
+     * @param int|null $timeout 超时秒数，null 使用 SDK 默认配置
      * @return bool
      */
-    public function exists(): bool
+    public function exists(?int $timeout = null): bool
     {
         if ($this->adapter === null) {
             return false;
         }
 
-        return $this->adapter->fetchAttributes('/' . $this->key()) !== null;
+        return $this->adapter->fetchAttributes('/' . $this->key(), $timeout) !== null;
     }
 
     // ==================== 域名识别 ====================
