@@ -199,6 +199,8 @@ class OssUrl extends HUrl
             return $this;
         }
 
+        $timeout = max(1, $timeout);
+
         $key = ltrim($this->getPath(), '/');
         $processValue = $this->extractQueryParam('x-oss-process');
 
@@ -1235,9 +1237,11 @@ class OssUrl extends HUrl
 
     private function removeOperation(string $operationName): static
     {
+        $instance = $this;
+
         // 在两个参数名中都尝试移除
         foreach (['x-oss-process', 'x-oss-async-process'] as $paramName) {
-            $current = $this->extractQueryParam($paramName);
+            $current = $instance->extractQueryParam($paramName);
             if (empty($current)) {
                 continue;
             }
@@ -1264,30 +1268,13 @@ class OssUrl extends HUrl
             $result = rtrim($result, '/');
 
             if (empty($result)) {
-                return $this->removeQueryRaw($paramName);
-            }
-
-            return $this->setQueryRaw($paramName, $result);
-        }
-
-        return $this;
-    }
-
-    /**
-     * 将当前 URL 的 process 参数合并到目标签名 URL
-     */
-    private function mergeProcessToUrl(OssUrl $signedUrl): static
-    {
-        $result = $signedUrl;
-
-        foreach (['x-oss-process', 'x-oss-async-process'] as $paramName) {
-            $value = $this->extractQueryParam($paramName);
-            if (!empty($value)) {
-                $result = $result->setQueryRaw($paramName, $value);
+                $instance = $instance->removeQueryRaw($paramName);
+            } else {
+                $instance = $instance->setQueryRaw($paramName, $result);
             }
         }
 
-        return $result;
+        return $instance;
     }
 
     private function getFirstPrefix(string $processValue): string

@@ -20,7 +20,13 @@ class Acl
         ];
     }
 
-    public static function toAcl($visibility): string
+    /**
+     * Visibility 转 ACL。
+     *
+     * 注意：Flysystem 只有 PUBLIC/PRIVATE 两种可见性，
+     * PUBLIC 始终映射为 public-read（而非 public-read-write），存在有损转换。
+     */
+    public static function toAcl(string $visibility): string
     {
         foreach (static::getAclMap() as $a => $v) {
             if ($visibility === $v) {
@@ -31,7 +37,7 @@ class Acl
         return self::OSS_ACL_TYPE_PRIVATE;
     }
 
-    public static function toVisibility($acl): string
+    public static function toVisibility(string $acl): string
     {
         foreach (static::getAclMap() as $a => $v) {
             if ($acl === $a) {

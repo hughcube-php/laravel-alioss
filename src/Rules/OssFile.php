@@ -2,7 +2,6 @@
 
 namespace HughCube\Laravel\AliOSS\Rules;
 
-use AlibabaCloud\Oss\V2 as Oss;
 use Closure;
 use HughCube\Laravel\AliOSS\OssAdapter;
 use HughCube\PUrl\HUrl;
@@ -266,216 +265,36 @@ class OssFile implements ValidationRule
 
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
-        $this->failReason = null;
-        $this->fileAttrs = null;
-        $this->detectedDomain = null;
-        $this->parsedPath = null;
-        $this->imageInfo = null;
+        $this->resetState();
 
         if (!HUrl::isUrlString($value)) {
-            $this->failReason = 'invalid_url';
-            $fail($this->message('invalid_url'));
+            $this->failWith('invalid_url', $fail);
             return;
         }
 
         $adapter = $this->resolveAdapter();
         if ($adapter === null) {
-            $this->failReason = 'invalid_disk';
-            $fail($this->message('invalid_disk'));
+            $this->failWith('invalid_disk', $fail);
             return;
         }
 
-        // 域名检查
-        $this->detectedDomain = $this->detectDomain($adapter, $value);
-
-        if ($this->allowedDomainTypes !== null) {
-            if ($this->detectedDomain === null || !in_array($this->detectedDomain, $this->allowedDomainTypes, true)) {
-                $this->failReason = $this->detectedDomain === null ? 'domain_mismatch' : 'domain_type_not_allowed';
-                $fail($this->message($this->failReason));
-                return;
-            }
-        } elseif (!$adapter->isBucketUrl($value)) {
-            $this->failReason = 'domain_mismatch';
-            $fail($this->message('domain_mismatch'));
+        if ($reason = $this->validateDomain($adapter, $value)) {
+            $this->failWith($reason, $fail);
             return;
         }
 
-        // 解析路径
-        $this->parsedPath = ltrim(HUrl::parse($value)?->getPath() ?? '', '/');
-        if (empty($this->parsedPath)) {
-            $this->failReason = 'invalid_path';
-            $fail($this->message('invalid_path'));
+        if ($reason = $this->validatePath($value)) {
+            $this->failWith($reason, $fail);
             return;
         }
 
-        // 扩展名白名单
-        $ext = strtolower(pathinfo($this->parsedPath, PATHINFO_EXTENSION));
-        if ($this->allowedExtensions !== null && !in_array($ext, $this->allowedExtensions, true)) {
-            $this->failReason = 'extension_not_allowed';
-            $fail($this->message('extension_not_allowed'));
+        if ($reason = $this->validateFileAttributes($adapter)) {
+            $this->failWith($reason, $fail);
             return;
         }
 
-        // 扩展名黑名单
-        if ($this->forbiddenExtensions !== null && in_array($ext, $this->forbiddenExtensions, true)) {
-            $this->failReason = 'extension_forbidden';
-            $fail($this->message('extension_forbidden'));
-            return;
-        }
-
-        // 目录白名单
-        if ($this->allowedDirectories !== null) {
-            $inAllowed = false;
-            foreach ($this->allowedDirectories as $dir) {
-                if ($dir === '' || str_starts_with($this->parsedPath, $dir . '/') || $this->parsedPath === $dir) {
-                    $inAllowed = true;
-                    break;
-                }
-            }
-            if (!$inAllowed) {
-                $this->failReason = 'directory_not_allowed';
-                $fail($this->message('directory_not_allowed'));
-                return;
-            }
-        }
-
-        // 目录黑名单
-        if ($this->forbiddenDirectories !== null) {
-            foreach ($this->forbiddenDirectories as $dir) {
-                if ($dir !== '' && (str_starts_with($this->parsedPath, $dir . '/') || $this->parsedPath === $dir)) {
-                    $this->failReason = 'directory_forbidden';
-                    $fail($this->message('directory_forbidden'));
-                    return;
-                }
-            }
-        }
-
-        // 文件名长度
-        $filename = pathinfo($this->parsedPath, PATHINFO_BASENAME);
-        if ($this->filenameMaxLen !== null && mb_strlen($filename) > $this->filenameMaxLen) {
-            $this->failReason = 'filename_too_long';
-            $fail($this->message('filename_too_long'));
-            return;
-        }
-
-        // 需要获取文件属性的条件
-        $needFileAttrs = $this->checkFileExists
-            || $this->minSize !== null
-            || $this->maxSize !== null
-            || $this->allowedMimeTypes !== null;
-
-        if ($needFileAttrs) {
-            try {
-                $result = $adapter->client()->headObject(
-                    new Oss\Models\HeadObjectRequest(bucket: $adapter->bucket(), key: $this->parsedPath)
-                );
-
-                $this->fileAttrs = new FileAttributes(
-                    $this->parsedPath,
-                    $result->contentLength ?? null,
-                    null,
-                    $result->lastModified?->getTimestamp(),
-                    $result->contentType ?? null
-                );
-            } catch (Oss\Exception\OperationException $e) {
-                $prev = $e->getPrevious();
-                if ($prev instanceof Oss\Exception\ServiceException && $prev->getStatusCode() === 404) {
-                    $this->failReason = 'file_not_found';
-                    $fail($this->message('file_not_found'));
-                    return;
-                }
-                throw $e;
-            }
-        }
-
-        // 大小验证
-        if ($this->fileAttrs !== null) {
-            $size = $this->fileAttrs->fileSize();
-
-            if ($this->minSize !== null && $size !== null && $size < $this->minSize) {
-                $this->failReason = 'file_too_small';
-                $fail($this->message('file_too_small'));
-                return;
-            }
-
-            if ($this->maxSize !== null && $size !== null && $size > $this->maxSize) {
-                $this->failReason = 'file_too_large';
-                $fail($this->message('file_too_large'));
-                return;
-            }
-
-            // MIME 类型验证
-            if ($this->allowedMimeTypes !== null) {
-                $mime = $this->fileAttrs->mimeType();
-                if ($mime === null || !$this->matchMimeType($mime, $this->allowedMimeTypes)) {
-                    $this->failReason = 'mime_type_not_allowed';
-                    $fail($this->message('mime_type_not_allowed'));
-                    return;
-                }
-            }
-        }
-
-        // 图片尺寸验证
-        $needImageInfo = $this->maxWidth !== null
-            || $this->maxHeight !== null
-            || $this->exactAspectRatio !== null
-            || $this->minAspectRatio !== null
-            || $this->maxAspectRatio !== null;
-
-        if ($needImageInfo) {
-            $this->imageInfo = $this->fetchImageInfo($adapter, $this->parsedPath);
-
-            if ($this->imageInfo === null) {
-                $this->failReason = 'file_not_found';
-                $fail($this->message('file_not_found'));
-                return;
-            }
-
-            $width = (int) ($this->imageInfo['ImageWidth']['value'] ?? 0);
-            $height = (int) ($this->imageInfo['ImageHeight']['value'] ?? 0);
-
-            if ($this->maxWidth !== null && $width > $this->maxWidth) {
-                $this->failReason = 'image_too_wide';
-                $fail($this->message('image_too_wide'));
-                return;
-            }
-
-            if ($this->maxHeight !== null && $height > $this->maxHeight) {
-                $this->failReason = 'image_too_tall';
-                $fail($this->message('image_too_tall'));
-                return;
-            }
-
-            if ($height > 0 && $width > 0) {
-                $ratio = $width / $height;
-
-                if ($this->exactAspectRatio !== null) {
-                    $expected = $this->exactAspectRatio[0] / $this->exactAspectRatio[1];
-                    if (abs($ratio - $expected) > 0.01) {
-                        $this->failReason = 'aspect_ratio_mismatch';
-                        $fail($this->message('aspect_ratio_mismatch'));
-                        return;
-                    }
-                }
-
-                if ($this->minAspectRatio !== null) {
-                    $min = $this->minAspectRatio[0] / $this->minAspectRatio[1];
-                    if ($ratio < $min - 0.01) {
-                        $this->failReason = 'aspect_ratio_too_narrow';
-                        $fail($this->message('aspect_ratio_too_narrow'));
-                        return;
-                    }
-                }
-
-                if ($this->maxAspectRatio !== null) {
-                    $max = $this->maxAspectRatio[0] / $this->maxAspectRatio[1];
-                    if ($ratio > $max + 0.01) {
-                        $this->failReason = 'aspect_ratio_too_wide';
-                        $fail($this->message('aspect_ratio_too_wide'));
-                        return;
-                    }
-                }
-            }
+        if ($reason = $this->validateImageDimensions($adapter)) {
+            $this->failWith($reason, $fail);
         }
     }
 
@@ -509,6 +328,174 @@ class OssFile implements ValidationRule
 
     // ==================== 内部方法 ====================
 
+    protected function resetState(): void
+    {
+        $this->failReason = null;
+        $this->fileAttrs = null;
+        $this->detectedDomain = null;
+        $this->parsedPath = null;
+        $this->imageInfo = null;
+    }
+
+    protected function failWith(string $reason, Closure $fail): void
+    {
+        $this->failReason = $reason;
+        $fail($this->message($reason));
+    }
+
+    protected function validateDomain(OssAdapter $adapter, string $value): ?string
+    {
+        $this->detectedDomain = $this->detectDomain($adapter, $value);
+
+        if ($this->allowedDomainTypes !== null) {
+            if ($this->detectedDomain === null || !in_array($this->detectedDomain, $this->allowedDomainTypes, true)) {
+                return $this->detectedDomain === null ? 'domain_mismatch' : 'domain_type_not_allowed';
+            }
+        } elseif (!$adapter->isBucketUrl($value)) {
+            return 'domain_mismatch';
+        }
+
+        return null;
+    }
+
+    protected function validatePath(string $value): ?string
+    {
+        $this->parsedPath = ltrim(HUrl::parse($value)?->getPath() ?? '', '/');
+        if (empty($this->parsedPath)) {
+            return 'invalid_path';
+        }
+
+        $ext = strtolower(pathinfo($this->parsedPath, PATHINFO_EXTENSION));
+
+        if ($this->allowedExtensions !== null && !in_array($ext, $this->allowedExtensions, true)) {
+            return 'extension_not_allowed';
+        }
+
+        if ($this->forbiddenExtensions !== null && in_array($ext, $this->forbiddenExtensions, true)) {
+            return 'extension_forbidden';
+        }
+
+        if ($this->allowedDirectories !== null) {
+            $inAllowed = false;
+            foreach ($this->allowedDirectories as $dir) {
+                if ($dir === '' || str_starts_with($this->parsedPath, $dir . '/') || $this->parsedPath === $dir) {
+                    $inAllowed = true;
+                    break;
+                }
+            }
+            if (!$inAllowed) {
+                return 'directory_not_allowed';
+            }
+        }
+
+        if ($this->forbiddenDirectories !== null) {
+            foreach ($this->forbiddenDirectories as $dir) {
+                if ($dir !== '' && (str_starts_with($this->parsedPath, $dir . '/') || $this->parsedPath === $dir)) {
+                    return 'directory_forbidden';
+                }
+            }
+        }
+
+        $filename = pathinfo($this->parsedPath, PATHINFO_BASENAME);
+        if ($this->filenameMaxLen !== null && mb_strlen($filename) > $this->filenameMaxLen) {
+            return 'filename_too_long';
+        }
+
+        return null;
+    }
+
+    protected function validateFileAttributes(OssAdapter $adapter): ?string
+    {
+        $needFileAttrs = $this->checkFileExists
+            || $this->minSize !== null
+            || $this->maxSize !== null
+            || $this->allowedMimeTypes !== null;
+
+        if (!$needFileAttrs) {
+            return null;
+        }
+
+        $this->fileAttrs = $adapter->fetchAttributes('/' . $this->parsedPath);
+        if ($this->fileAttrs === null) {
+            return 'file_not_found';
+        }
+
+        $size = $this->fileAttrs->fileSize();
+
+        if ($this->minSize !== null && $size !== null && $size < $this->minSize) {
+            return 'file_too_small';
+        }
+
+        if ($this->maxSize !== null && $size !== null && $size > $this->maxSize) {
+            return 'file_too_large';
+        }
+
+        if ($this->allowedMimeTypes !== null) {
+            $mime = $this->fileAttrs->mimeType();
+            if ($mime === null || !$this->matchMimeType($mime, $this->allowedMimeTypes)) {
+                return 'mime_type_not_allowed';
+            }
+        }
+
+        return null;
+    }
+
+    protected function validateImageDimensions(OssAdapter $adapter): ?string
+    {
+        $needImageInfo = $this->maxWidth !== null
+            || $this->maxHeight !== null
+            || $this->exactAspectRatio !== null
+            || $this->minAspectRatio !== null
+            || $this->maxAspectRatio !== null;
+
+        if (!$needImageInfo) {
+            return null;
+        }
+
+        $this->imageInfo = $adapter->fetchImageInfo('/' . $this->parsedPath);
+        if ($this->imageInfo === null) {
+            return 'file_not_found';
+        }
+
+        $width = (int) ($this->imageInfo['ImageWidth']['value'] ?? 0);
+        $height = (int) ($this->imageInfo['ImageHeight']['value'] ?? 0);
+
+        if ($this->maxWidth !== null && $width > $this->maxWidth) {
+            return 'image_too_wide';
+        }
+
+        if ($this->maxHeight !== null && $height > $this->maxHeight) {
+            return 'image_too_tall';
+        }
+
+        if ($height > 0 && $width > 0) {
+            $ratio = $width / $height;
+
+            if ($this->exactAspectRatio !== null) {
+                $expected = $this->exactAspectRatio[0] / $this->exactAspectRatio[1];
+                if (abs($ratio - $expected) > 0.01) {
+                    return 'aspect_ratio_mismatch';
+                }
+            }
+
+            if ($this->minAspectRatio !== null) {
+                $min = $this->minAspectRatio[0] / $this->minAspectRatio[1];
+                if ($ratio < $min - 0.01) {
+                    return 'aspect_ratio_too_narrow';
+                }
+            }
+
+            if ($this->maxAspectRatio !== null) {
+                $max = $this->maxAspectRatio[0] / $this->maxAspectRatio[1];
+                if ($ratio > $max + 0.01) {
+                    return 'aspect_ratio_too_wide';
+                }
+            }
+        }
+
+        return null;
+    }
+
     protected function resolveAdapter(): ?OssAdapter
     {
         $disk = Storage::disk($this->disk ?: 'oss');
@@ -536,25 +523,6 @@ class OssFile implements ValidationRule
             if (str_ends_with($pattern, '/*') && str_starts_with($mimeType, substr($pattern, 0, -1))) return true;
         }
         return false;
-    }
-
-    protected function fetchImageInfo(OssAdapter $adapter, string $path): ?array
-    {
-        try {
-            $result = $adapter->client()->getObject(
-                new Oss\Models\GetObjectRequest(
-                    bucket: $adapter->bucket(),
-                    key: $path,
-                    process: 'image/info',
-                )
-            );
-
-            $json = $result->body->getContents();
-            $data = json_decode($json, true);
-            return is_array($data) ? $data : null;
-        } catch (Oss\Exception\OperationException) {
-            return null;
-        }
     }
 
     protected function message(string $key): string

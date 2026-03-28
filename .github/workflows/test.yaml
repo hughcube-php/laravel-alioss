@@ -3,38 +3,79 @@ name: Test
 on: [ push, pull_request ]
 
 jobs:
-  run:
-    runs-on: ${{ matrix.operating-system }}
+  run-linux:
+    runs-on: ubuntu-latest
     strategy:
       max-parallel: 15
-      matrix:
-        operating-system: [ ubuntu-latest, macOS-latest ]
-        php-versions: [ '8.0', '8.1' ]
-    name: PHP ${{ matrix.php-versions }} Test on ${{ matrix.operating-system }}
-    steps:
+      matrix: &matrix
+        php: [ 8.1, 8.2, 8.3, 8.4, 8.5 ]
+        laravel: [ 10, 11, 12, 13 ]
+    name: PHP ${{ matrix.php }} Laravel ${{ matrix.laravel }} Test on ubuntu-latest
+    env: &env
+      ALIOSS_ACCESS_KEY_ID: ${{ secrets.ALIOSS_ACCESS_KEY_ID }}
+      ALIOSS_ACCESS_KEY_SECRET: ${{ secrets.ALIOSS_ACCESS_KEY_SECRET }}
+      ALIOSS_ENDPOINT: ${{ secrets.ALIOSS_ENDPOINT }}
+      ALIOSS_BUCKET: ${{ secrets.ALIOSS_BUCKET }}
+      ALIOSS_REGION: ${{ secrets.ALIOSS_REGION }}
+      ALIOSS_IS_CNAME: 'false'
+      ALIOSS_CDN_BASE_URL: ${{ secrets.ALIOSS_CDN_BASE_URL }}
+      ALIOSS_UPLOAD_BASE_URL: ${{ secrets.ALIOSS_UPLOAD_BASE_URL }}
+      ALIOSS_SECURITY_TOKEN: ''
+      ALIOSS_PREFIX: ''
+    steps: &common_steps
       - name: Checkout
         uses: actions/checkout@master
 
       - name: Setup PHP
         uses: shivammathur/setup-php@master
         with:
-          php-version: ${{ matrix.php-versions }}
-          extension-csv: mbstring, xdebug #optional, setup extensions
-          ini-values-csv: post_max_size=256M, short_open_tag=On #optional, setup php.ini configuration
-          coverage: xdebug #optional, setup coverage driver
-          pecl: true #optional, setup PECL
+          php-version: ${{ matrix.php }}
+          extensions: mbstring, xdebug, gd
+          tools: composer:v2
+          ini-values: post_max_size=256M, short_open_tag=On
 
       - name: System Setting
         run: |
           php -v
           composer -V
           php -m
+
       - name: Validate composer.json and composer.lock
         run: composer validate
 
       - name: Install dependencies
-        run: composer install --prefer-dist --no-progress --no-suggest
+        run: |
+          echo "has_deps=false" >> "$GITHUB_ENV"
+          composer require laravel/framework:^${{ matrix.laravel }} --dev --no-update --prefer-stable
+          composer update --prefer-stable --prefer-dist --no-interaction --no-progress
+          echo "has_deps=true" >> "$GITHUB_ENV"
+        continue-on-error: true
+
+      - name: Composer Info
+        if: ${{ 'true' == env.has_deps }}
+        run: composer info
 
       - name: Run PHPUnit
-        run: |
-          ./vendor/bin/phpunit ./tests/ --exclude-group authCase
+        if: ${{ 'true' == env.has_deps }}
+        run: composer run-script test -- -c phpunit.xml.dist --testdox
+
+  run-macos:
+    runs-on: macOS-latest
+    strategy:
+      max-parallel: 15
+      matrix: *matrix
+    name: PHP ${{ matrix.php }} Laravel ${{ matrix.laravel }} Test on macOS-latest
+    env: *env
+    steps: *common_steps
+
+  run-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      max-parallel: 15
+      matrix: *matrix
+    name: PHP ${{ matrix.php }} Laravel ${{ matrix.laravel }} Test on windows-latest
+    env: *env
+    steps: *common_steps

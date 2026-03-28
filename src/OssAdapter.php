@@ -13,6 +13,7 @@ use League\Flysystem\Config;
 use League\Flysystem\FileAttributes;
 use League\Flysystem\FilesystemAdapter;
 use League\Flysystem\PathPrefixer;
+use Psr\Http\Message\UriInterface;
 
 class OssAdapter implements FilesystemAdapter
 {
@@ -81,12 +82,12 @@ class OssAdapter implements FilesystemAdapter
         return ($this->config['region'] ?? null) ?: null;
     }
 
-    public function accessKeyId(): string
+    protected function accessKeyId(): string
     {
         return $this->config['accessKeyId'];
     }
 
-    public function accessKeySecret(): string
+    protected function accessKeySecret(): string
     {
         return $this->config['accessKeySecret'];
     }
@@ -209,6 +210,7 @@ class OssAdapter implements FilesystemAdapter
 
     public function signUrl(string $path, int $timeout = 60): OssUrl
     {
+        $timeout = max(1, $timeout);
         $presignResult = $this->client()->presign(
             new Oss\Models\GetObjectRequest(
                 bucket: $this->bucket(),
@@ -222,6 +224,7 @@ class OssAdapter implements FilesystemAdapter
 
     public function signUploadUrl(string $path, int $timeout = 60): OssUrl
     {
+        $timeout = max(1, $timeout);
         $presignResult = $this->client()->presign(
             new Oss\Models\PutObjectRequest(
                 bucket: $this->bucket(),
@@ -235,6 +238,7 @@ class OssAdapter implements FilesystemAdapter
 
     public function presign(string $path, int $timeout = 60, string $method = 'GET'): Oss\Models\PresignResult
     {
+        $timeout = max(1, $timeout);
         $request = match (strtoupper($method)) {
             'PUT'   => new Oss\Models\PutObjectRequest(bucket: $this->bucket(), key: $this->resolveKey($path)),
             'HEAD'  => new Oss\Models\HeadObjectRequest(bucket: $this->bucket(), key: $this->resolveKey($path)),
@@ -303,6 +307,9 @@ class OssAdapter implements FilesystemAdapter
         return $this->client()->isObjectExist($this->bucket(), $this->resolveKey($path));
     }
 
+    /**
+     * OSS 没有真实目录概念，始终返回 true。
+     */
     public function directoryExists(string $path): bool
     {
         return true;
@@ -342,19 +349,24 @@ class OssAdapter implements FilesystemAdapter
 
     public function read(string $path): string
     {
-        $result = $this->client()->getObject(
-            new Oss\Models\GetObjectRequest(bucket: $this->bucket(), key: $this->resolveKey($path))
-        );
-
-        return $result->body->getContents();
+        return $this->fetch($path);
     }
 
     public function readStream(string $path)
     {
-        $contents = $this->read($path);
+        $result = $this->client()->getObject(
+            new Oss\Models\GetObjectRequest(bucket: $this->bucket(), key: $this->resolveKey($path))
+        );
 
+        $resource = $result->body?->detach();
+        if (is_resource($resource)) {
+            return $resource;
+        }
+
+        // fallback: 如果 detach 失败，退化为内存读取
+        /** @var resource $stream */
         $stream = fopen('php://temp', 'w+b');
-        fwrite($stream, $contents);
+        fwrite($stream, $result->body?->getContents() ?? '');
         rewind($stream);
 
         return $stream;
@@ -369,7 +381,7 @@ class OssAdapter implements FilesystemAdapter
 
     public function deleteDirectory(string $path): void
     {
-        throw new BadMethodCallException();
+        throw new BadMethodCallException('OSS does not support recursive directory deletion.');
     }
 
     public function createDirectory(string $path, ?Config $config = null): void
@@ -426,7 +438,7 @@ class OssAdapter implements FilesystemAdapter
 
     public function listContents(string $path, bool $deep): iterable
     {
-        throw new BadMethodCallException();
+        throw new BadMethodCallException('OSS listContents is not implemented.');
     }
 
     public function copy(string $source, string $destination, ?Config $config = null): void
@@ -464,9 +476,20 @@ class OssAdapter implements FilesystemAdapter
 
     // ==================== 扩展操作 ====================
 
-    public function writeFile($file, string $path): OssUrl
+    public function writeFile(string $file, string $path): OssUrl
     {
-        $this->write($path, file_get_contents($file));
+        $stream = fopen($file, 'rb');
+        if ($stream === false) {
+            throw new \InvalidArgumentException("Cannot open file: {$file}");
+        }
+
+        try {
+            $this->writeStream($path, $stream);
+        } finally {
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+        }
 
         return $this->cdnUrl($path) ?? $this->url($path);
     }
@@ -507,15 +530,51 @@ class OssAdapter implements FilesystemAdapter
 
         $path = trim(sprintf('/%s/%s', trim($prefix, '/'), trim($source->getPath(), '/')), '/');
 
-        return $this->writeFromUrl($sourceUrl, $path);
+        return $this->writeFromUrl($source->toString(), $path);
     }
 
-    public function download(string $path, string $file): void
+    /**
+     * 下载文件到本地。
+     *
+     * 自动识别参数：传入 path 或完整 URL 均可。
+     *
+     * @param string|UriInterface $pathOrUrl OSS path、URL 字符串或 UriInterface 对象
+     * @param string $file 本地保存路径
+     */
+    public function download($pathOrUrl, string $file): void
     {
+        $key = $this->resolveAny($pathOrUrl);
+        if ($key === null || $key === '') {
+            throw new \InvalidArgumentException('Invalid path or URL');
+        }
+
         $this->client()->getObjectToFile(
-            new Oss\Models\GetObjectRequest(bucket: $this->bucket(), key: $this->resolveKey($path)),
+            new Oss\Models\GetObjectRequest(bucket: $this->bucket(), key: $key),
             $file
         );
+    }
+
+    /**
+     * 读取文件内容。
+     *
+     * 自动识别参数：传入 path 或完整 URL 均可。
+     * 与 Flysystem 的 read() 不同：此方法接受 URL。
+     *
+     * @param string|UriInterface $pathOrUrl OSS path、URL 字符串或 UriInterface 对象
+     * @return string 文件内容
+     */
+    public function fetch($pathOrUrl): string
+    {
+        $key = $this->resolveAny($pathOrUrl);
+        if ($key === null || $key === '') {
+            throw new \InvalidArgumentException('Invalid path or URL');
+        }
+
+        $result = $this->client()->getObject(
+            new Oss\Models\GetObjectRequest(bucket: $this->bucket(), key: $key)
+        );
+
+        return $result->body->getContents();
     }
 
     public function symlink(string $link, string $target): void
@@ -543,12 +602,12 @@ class OssAdapter implements FilesystemAdapter
      * 自动识别参数：传入 path 或完整 URL 均可。
      * 文件不存在或非图片返回 null。
      *
-     * @param string $pathOrUrl 相对路径或完整 URL
+     * @param string|UriInterface $pathOrUrl OSS path、URL 字符串或 UriInterface 对象
      * @return array|null
      */
-    public function fetchImageInfo(string $pathOrUrl): ?array
+    public function fetchImageInfo($pathOrUrl): ?array
     {
-        $key = $this->resolvePathOrUrl($pathOrUrl);
+        $key = $this->resolveAny($pathOrUrl);
         if ($key === null) {
             return null;
         }
@@ -580,12 +639,12 @@ class OssAdapter implements FilesystemAdapter
      * 自动识别参数：传入 path 或完整 URL 均可。
      * 与 Flysystem 的 fileAttributes() 不同：此方法接受 URL，且文件不存在返回 null 而非抛异常。
      *
-     * @param string $pathOrUrl 相对路径或完整 URL
+     * @param string|UriInterface $pathOrUrl OSS path、URL 字符串或 UriInterface 对象
      * @return FileAttributes|null
      */
-    public function fetchAttributes(string $pathOrUrl): ?FileAttributes
+    public function fetchAttributes($pathOrUrl): ?FileAttributes
     {
-        $key = $this->resolvePathOrUrl($pathOrUrl);
+        $key = $this->resolveAny($pathOrUrl);
         if ($key === null) {
             return null;
         }
@@ -626,11 +685,25 @@ class OssAdapter implements FilesystemAdapter
     }
 
     /**
-     * 自动识别参数是 path 还是 URL，返回 OSS key。
-     * URL 直接取 path 部分（不走 prefix），普通 path 走 resolveKey。
+     * 统一解析输入为 OSS key，支持四种格式：
+     *
+     * - UriInterface 对象：取 getPath()，当绝对 key
+     * - URL 字符串（含 ://）：解析后取 path，当绝对 key
+     * - `/` 开头的字符串：绝对 key，去掉前导 `/`，不走 prefix
+     * - 其他字符串：当作 OSS path，走 prefixPath 加 prefix
+     *
+     * @param string|UriInterface $pathOrUrl
      */
-    private function resolvePathOrUrl(string $pathOrUrl): ?string
+    private function resolveAny(string|UriInterface $pathOrUrl): ?string
     {
+        // UriInterface 对象
+        if ($pathOrUrl instanceof UriInterface) {
+            $key = ltrim($pathOrUrl->getPath(), '/');
+
+            return !empty($key) ? $key : null;
+        }
+
+        // URL 字符串
         if (HUrl::isUrlString($pathOrUrl)) {
             $parsed = HUrl::parse($pathOrUrl);
             if (!$parsed instanceof HUrl) {
@@ -642,6 +715,14 @@ class OssAdapter implements FilesystemAdapter
             return !empty($key) ? $key : null;
         }
 
+        // / 开头 = 绝对 key，不走 prefix
+        if (str_starts_with($pathOrUrl, '/')) {
+            $key = ltrim($pathOrUrl, '/');
+
+            return !empty($key) ? $key : null;
+        }
+
+        // 普通 path，走 prefix
         return $this->resolveKey($pathOrUrl);
     }
 
