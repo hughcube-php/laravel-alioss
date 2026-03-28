@@ -3,6 +3,7 @@
 namespace HughCube\Laravel\AliOSS\Tests;
 
 use GuzzleHttp\Client as HttpClient;
+use HughCube\Laravel\AliOSS\OssAdapter;
 use HughCube\Laravel\AliOSS\OssUrl;
 use Illuminate\Support\Str;
 
@@ -17,6 +18,10 @@ class OssUrlIntegrationTest extends TestCase
     private static ?string $textPath = null;
     private static bool $initialized = false;
 
+    /** @var array<string> 记录所有创建的文件路径，tearDownAfterClass 统一清理 */
+    private static array $createdPaths = [];
+    private static ?array $adapterConfig = null;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -24,14 +29,28 @@ class OssUrlIntegrationTest extends TestCase
         if (!self::$initialized) {
             $adapter = $this->getOssAdapter();
 
+            // 保存配置供 tearDownAfterClass 使用
+            self::$adapterConfig = [
+                'accessKeyId' => env('ALIOSS_ACCESS_KEY_ID', 'test-access-key-id'),
+                'accessKeySecret' => env('ALIOSS_ACCESS_KEY_SECRET', 'test-access-key-secret'),
+                'endpoint' => env('ALIOSS_ENDPOINT', 'oss-cn-hangzhou.aliyuncs.com'),
+                'bucket' => env('ALIOSS_BUCKET', 'test-bucket'),
+                'region' => env('ALIOSS_REGION', 'cn-hangzhou'),
+                'isCName' => env('ALIOSS_IS_CNAME', false),
+                'prefix' => '',
+                'cdnBaseUrl' => env('ALIOSS_CDN_BASE_URL', 'https://cdn.example.com'),
+                'uploadBaseUrl' => env('ALIOSS_UPLOAD_BASE_URL', 'https://upload.example.com'),
+            ];
+
             // 上传一张真实 PNG 图片（100x100 像素红色）
             self::$imagePath = $this->testPath('oss-url-test-' . Str::random(16) . '.png');
-            $png = $this->createTestPng();
-            $adapter->write(self::$imagePath, $png);
+            $adapter->write(self::$imagePath, $this->createTestPng());
+            self::$createdPaths[] = self::$imagePath;
 
             // 上传一个文本文件
             self::$textPath = $this->testPath('oss-url-test-' . Str::random(16) . '.txt');
             $adapter->write(self::$textPath, 'Hello OSS URL Integration Test');
+            self::$createdPaths[] = self::$textPath;
 
             self::$initialized = true;
         }
@@ -39,34 +58,21 @@ class OssUrlIntegrationTest extends TestCase
 
     public static function tearDownAfterClass(): void
     {
-        // 注意：需要在子类中手动清理，因为 static 方法没有 $this
-        // 清理在最后一个测试的 tearDown 中处理
-    }
-
-    protected function tearDown(): void
-    {
-        parent::tearDown();
-    }
-
-    /**
-     * 最后清理测试文件
-     */
-    public function testZzCleanup(): void
-    {
-        $adapter = $this->getOssAdapter();
-
-        if (self::$imagePath !== null) {
-            $adapter->delete(self::$imagePath);
-            $this->assertFalse($adapter->fileExists(self::$imagePath));
+        if (self::$adapterConfig !== null && !empty(self::$createdPaths)) {
+            $adapter = new OssAdapter(self::$adapterConfig);
+            foreach (self::$createdPaths as $path) {
+                try {
+                    $adapter->delete($path);
+                } catch (\Throwable $e) {
+                }
+            }
         }
 
-        if (self::$textPath !== null) {
-            $adapter->delete(self::$textPath);
-            $this->assertFalse($adapter->fileExists(self::$textPath));
-        }
-
+        self::$createdPaths = [];
+        self::$imagePath = null;
+        self::$textPath = null;
         self::$initialized = false;
-        $this->assertTrue(true);
+        self::$adapterConfig = null;
     }
 
     // ==================== 基础 URL 生成 ====================
@@ -177,7 +183,6 @@ class OssUrlIntegrationTest extends TestCase
             ->sign(300);
 
         $str = (string) $url;
-        // 验证 URL 格式正确：image/ 前缀只出现一次
         $processParam = $this->extractProcessParam($str);
         $this->assertSame(1, substr_count($processParam, 'image/'));
         $this->assertStringContainsString('resize,', $processParam);
@@ -185,7 +190,6 @@ class OssUrlIntegrationTest extends TestCase
         $this->assertStringContainsString('format,jpg', $processParam);
         $this->assertStringContainsString('quality,q_80', $processParam);
 
-        // 验证 OSS 能正确处理
         $response = (new HttpClient())->get($str);
         $this->assertSame(200, $response->getStatusCode());
     }
@@ -285,7 +289,6 @@ class OssUrlIntegrationTest extends TestCase
             ->imageRemoveRotate()
             ->sign(300);
 
-        // URL 中不应包含 rotate
         $processParam = $this->extractProcessParam((string) $url);
         $this->assertStringNotContainsString('rotate', $processParam);
         $this->assertStringContainsString('resize,', $processParam);
@@ -300,15 +303,12 @@ class OssUrlIntegrationTest extends TestCase
     {
         $adapter = $this->getOssAdapter();
 
-        // 先构建带 process 的 CDN URL
         $cdnUrl = $adapter->cdnUrl(self::$imagePath);
         if ($cdnUrl === null) {
             $this->markTestSkipped('CDN not configured');
         }
 
         $processed = $cdnUrl->imageResize(100)->imageFormat('jpg');
-
-        // 转换到 OSS 域名后签名访问
         $ossUrl = $processed->toOss()->sign(300);
 
         $response = (new HttpClient())->get((string) $ossUrl);
@@ -371,17 +371,12 @@ class OssUrlIntegrationTest extends TestCase
         $original = $adapter->ossUrl(self::$imagePath);
         $modified = $original->imageResize(100);
 
-        // original 没有 process 参数
         $this->assertStringNotContainsString('x-oss-process', (string) $original);
-        // modified 有
         $this->assertStringContainsString('x-oss-process', (string) $modified);
     }
 
     // ==================== 辅助方法 ====================
 
-    /**
-     * 创建 100x100 像素红色 PNG
-     */
     private function createTestPng(): string
     {
         $img = imagecreatetruecolor(100, 100);
@@ -396,9 +391,6 @@ class OssUrlIntegrationTest extends TestCase
         return $data;
     }
 
-    /**
-     * 从 URL 中提取 x-oss-process 参数值
-     */
     private function extractProcessParam(string $url): string
     {
         $query = parse_url($url, PHP_URL_QUERY);
