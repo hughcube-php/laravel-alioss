@@ -42,7 +42,7 @@
         }
     },
     "scripts": {
-        "test": "phpunit --verbose --coverage-clover=coverage.clover",
+        "test": "phpunit",
         "phpstan": "phpstan analyse -vvv",
         "check-style": "phpcs -p --standard=PSR2 src/ -v",
         "fix-style": "phpcbf -p --standard=PSR2 src/ -v"
