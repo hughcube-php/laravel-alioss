@@ -249,7 +249,8 @@ class OssFileTest extends TestCase
     public function testQueryMethods(): void
     {
         $adapter = $this->getOssAdapter();
-        $path = $this->testPath('images/test.jpg');
+        $name = Str::random(16) . '.jpg';
+        $path = $this->testPath('images/' . $name);
 
         try {
             $adapter->write($path, 'test');
@@ -260,7 +261,7 @@ class OssFileTest extends TestCase
             });
 
             $this->assertNotNull($rule->path());
-            $this->assertSame('test.jpg', $rule->filename());
+            $this->assertSame($name, $rule->filename());
             $this->assertSame('jpg', $rule->extension());
             $this->assertNotNull($rule->getDirectory());
             $this->assertNotNull($rule->domainType());
