@@ -14,6 +14,12 @@ use Orchestra\Testbench\TestCase as OrchestraTestCase;
 
 abstract class TestCase extends OrchestraTestCase
 {
+    protected function testPath(string $suffix): string
+    {
+        $prefix = env('ALIOSS_TEST_PATH_PREFIX', 'Test/LaravelAlioss/GitHubActions');
+        return rtrim($prefix, '/') . '/' . ltrim($suffix, '/');
+    }
+
     protected function setUp(): void
     {
         $this->loadEnv();

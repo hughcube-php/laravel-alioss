@@ -14,20 +14,23 @@ class OssFileTest extends TestCase
     public function testValidationPassesWithValidUrl(): void
     {
         $adapter = $this->getOssAdapter();
-        $path = 'test/' . Str::random(32) . '.txt';
-        $adapter->write($path, 'content');
+        $path = $this->testPath(Str::random(32) . '.txt');
 
-        $url = $adapter->cdnUrl($path) ?? $adapter->url($path);
-        $validator = Validator::make(['url' => $url], ['url' => new OssFile()]);
-        $this->assertTrue($validator->passes());
-
-        $adapter->delete($path);
+        try {
+            $adapter->write($path, 'content');
+            $url = $adapter->cdnUrl($path) ?? $adapter->url($path);
+            $validator = Validator::make(['url' => $url], ['url' => new OssFile()]);
+            $this->assertTrue($validator->passes());
+        } finally {
+            $adapter->delete($path);
+        }
     }
 
     public function testValidationFailsWithNonExistentFile(): void
     {
         $adapter = $this->getOssAdapter();
-        $url = ($adapter->cdnBaseUrl() ?? $adapter->uploadBaseUrl()) . '/nonexistent-' . Str::random(32) . '.jpg';
+        $prefix = $this->testPath('nonexistent-' . Str::random(32) . '.jpg');
+        $url = ($adapter->cdnBaseUrl() ?? $adapter->uploadBaseUrl()) . '/' . $prefix;
         $validator = Validator::make(['url' => $url], ['url' => new OssFile()]);
         $this->assertFalse($validator->passes());
     }
@@ -57,166 +60,214 @@ class OssFileTest extends TestCase
     public function testCdnDomainConstraint(): void
     {
         $adapter = $this->getOssAdapter();
-        if (!$adapter->cdnBaseUrl()) $this->markTestSkipped('No CDN configured');
+        if (!$adapter->cdnBaseUrl()) {
+            $this->markTestSkipped('No CDN configured');
+        }
 
-        $path = 'test/' . Str::random(32) . '.txt';
-        $adapter->write($path, 'test');
-        $cdnUrl = $adapter->cdnUrl($path);
+        $path = $this->testPath(Str::random(32) . '.txt');
 
-        $rule = OssFile::make()->cdnDomain();
-        $failed = false;
-        $rule->validate('url', $cdnUrl, function() use (&$failed) { $failed = true; });
-        $this->assertFalse($failed);
-        $this->assertTrue($rule->isCdnDomain());
+        try {
+            $adapter->write($path, 'test');
+            $cdnUrl = $adapter->cdnUrl($path);
 
-        $adapter->delete($path);
+            $rule = OssFile::make()->cdnDomain();
+            $failed = false;
+            $rule->validate('url', $cdnUrl, function () use (&$failed) {
+                $failed = true;
+            });
+            $this->assertFalse($failed);
+            $this->assertTrue($rule->isCdnDomain());
+        } finally {
+            $adapter->delete($path);
+        }
     }
 
     public function testFailedReason(): void
     {
         $rule = new OssFile();
-        $rule->validate('url', 'not-a-url', function() {});
+        $rule->validate('url', 'not-a-url', function () {
+        });
         $this->assertSame('invalid_url', $rule->failedReason());
     }
 
     public function testFailedReasonDomainMismatch(): void
     {
         $rule = new OssFile();
-        $rule->validate('url', 'https://other.example.com/file.jpg', function() {});
+        $rule->validate('url', 'https://other.example.com/file.jpg', function () {
+        });
         $this->assertSame('domain_mismatch', $rule->failedReason());
     }
 
     public function testMinSizeConstraint(): void
     {
         $adapter = $this->getOssAdapter();
-        $path = 'test/' . Str::random(32) . '.txt';
-        $adapter->write($path, 'small');
-        $url = $adapter->cdnUrl($path) ?? $adapter->url($path);
+        $path = $this->testPath(Str::random(32) . '.txt');
 
-        $rule = OssFile::make()->minSize(100);
-        $failed = false;
-        $rule->validate('url', $url, function() use (&$failed) { $failed = true; });
-        $this->assertTrue($failed);
-        $this->assertSame('file_too_small', $rule->failedReason());
+        try {
+            $adapter->write($path, 'small');
+            $url = $adapter->cdnUrl($path) ?? $adapter->url($path);
 
-        $adapter->delete($path);
+            $rule = OssFile::make()->minSize(100);
+            $failed = false;
+            $rule->validate('url', $url, function () use (&$failed) {
+                $failed = true;
+            });
+            $this->assertTrue($failed);
+            $this->assertSame('file_too_small', $rule->failedReason());
+        } finally {
+            $adapter->delete($path);
+        }
     }
 
     public function testMaxSizeConstraint(): void
     {
         $adapter = $this->getOssAdapter();
-        $path = 'test/' . Str::random(32) . '.txt';
-        $adapter->write($path, str_repeat('x', 100));
-        $url = $adapter->cdnUrl($path) ?? $adapter->url($path);
+        $path = $this->testPath(Str::random(32) . '.txt');
 
-        $rule = OssFile::make()->maxSize(50);
-        $failed = false;
-        $rule->validate('url', $url, function() use (&$failed) { $failed = true; });
-        $this->assertTrue($failed);
-        $this->assertSame('file_too_large', $rule->failedReason());
+        try {
+            $adapter->write($path, str_repeat('x', 100));
+            $url = $adapter->cdnUrl($path) ?? $adapter->url($path);
 
-        $adapter->delete($path);
+            $rule = OssFile::make()->maxSize(50);
+            $failed = false;
+            $rule->validate('url', $url, function () use (&$failed) {
+                $failed = true;
+            });
+            $this->assertTrue($failed);
+            $this->assertSame('file_too_large', $rule->failedReason());
+        } finally {
+            $adapter->delete($path);
+        }
     }
 
     public function testExtensionsWhitelist(): void
     {
         $adapter = $this->getOssAdapter();
-        $path = 'test/' . Str::random(32) . '.txt';
-        $adapter->write($path, 'test');
-        $url = $adapter->cdnUrl($path) ?? $adapter->url($path);
+        $path = $this->testPath(Str::random(32) . '.txt');
 
-        $rule = OssFile::make()->extensions(['jpg', 'png']);
-        $failed = false;
-        $rule->validate('url', $url, function() use (&$failed) { $failed = true; });
-        $this->assertTrue($failed);
-        $this->assertSame('extension_not_allowed', $rule->failedReason());
+        try {
+            $adapter->write($path, 'test');
+            $url = $adapter->cdnUrl($path) ?? $adapter->url($path);
 
-        $adapter->delete($path);
+            $rule = OssFile::make()->extensions(['jpg', 'png']);
+            $failed = false;
+            $rule->validate('url', $url, function () use (&$failed) {
+                $failed = true;
+            });
+            $this->assertTrue($failed);
+            $this->assertSame('extension_not_allowed', $rule->failedReason());
+        } finally {
+            $adapter->delete($path);
+        }
     }
 
     public function testExceptExtensions(): void
     {
         $adapter = $this->getOssAdapter();
-        $path = 'test/' . Str::random(32) . '.php';
-        $adapter->write($path, 'test');
-        $url = $adapter->cdnUrl($path) ?? $adapter->url($path);
+        $path = $this->testPath(Str::random(32) . '.php');
 
-        $rule = OssFile::make()->exceptExtensions(['exe', 'php']);
-        $failed = false;
-        $rule->validate('url', $url, function() use (&$failed) { $failed = true; });
-        $this->assertTrue($failed);
-        $this->assertSame('extension_forbidden', $rule->failedReason());
+        try {
+            $adapter->write($path, 'test');
+            $url = $adapter->cdnUrl($path) ?? $adapter->url($path);
 
-        $adapter->delete($path);
+            $rule = OssFile::make()->exceptExtensions(['exe', 'php']);
+            $failed = false;
+            $rule->validate('url', $url, function () use (&$failed) {
+                $failed = true;
+            });
+            $this->assertTrue($failed);
+            $this->assertSame('extension_forbidden', $rule->failedReason());
+        } finally {
+            $adapter->delete($path);
+        }
     }
 
     public function testDirectoryConstraint(): void
     {
         $adapter = $this->getOssAdapter();
-        $path = 'other/' . Str::random(32) . '.txt';
-        $adapter->write($path, 'test');
-        $url = $adapter->cdnUrl($path) ?? $adapter->url($path);
+        $path = $this->testPath('other/' . Str::random(32) . '.txt');
 
-        $rule = OssFile::make()->directory('uploads');
-        $failed = false;
-        $rule->validate('url', $url, function() use (&$failed) { $failed = true; });
-        $this->assertTrue($failed);
-        $this->assertSame('directory_not_allowed', $rule->failedReason());
+        try {
+            $adapter->write($path, 'test');
+            $url = $adapter->cdnUrl($path) ?? $adapter->url($path);
 
-        $adapter->delete($path);
+            $rule = OssFile::make()->directory('uploads');
+            $failed = false;
+            $rule->validate('url', $url, function () use (&$failed) {
+                $failed = true;
+            });
+            $this->assertTrue($failed);
+            $this->assertSame('directory_not_allowed', $rule->failedReason());
+        } finally {
+            $adapter->delete($path);
+        }
     }
 
     public function testExceptDirectory(): void
     {
         $adapter = $this->getOssAdapter();
-        $path = 'private/' . Str::random(32) . '.txt';
-        $adapter->write($path, 'test');
-        $url = $adapter->cdnUrl($path) ?? $adapter->url($path);
+        $path = $this->testPath('private/' . Str::random(32) . '.txt');
 
-        $rule = OssFile::make()->exceptDirectory('private');
-        $failed = false;
-        $rule->validate('url', $url, function() use (&$failed) { $failed = true; });
-        $this->assertTrue($failed);
-        $this->assertSame('directory_forbidden', $rule->failedReason());
+        try {
+            $adapter->write($path, 'test');
+            $url = $adapter->cdnUrl($path) ?? $adapter->url($path);
 
-        $adapter->delete($path);
+            $rule = OssFile::make()->exceptDirectory($this->testPath('private'));
+            $failed = false;
+            $rule->validate('url', $url, function () use (&$failed) {
+                $failed = true;
+            });
+            $this->assertTrue($failed);
+            $this->assertSame('directory_forbidden', $rule->failedReason());
+        } finally {
+            $adapter->delete($path);
+        }
     }
 
     public function testFilenameMaxLength(): void
     {
         $adapter = $this->getOssAdapter();
         $longName = Str::random(60) . '.txt';
-        $path = 'test/' . $longName;
-        $adapter->write($path, 'test');
-        $url = $adapter->cdnUrl($path) ?? $adapter->url($path);
+        $path = $this->testPath($longName);
 
-        $rule = OssFile::make()->filenameMaxLength(50);
-        $failed = false;
-        $rule->validate('url', $url, function() use (&$failed) { $failed = true; });
-        $this->assertTrue($failed);
-        $this->assertSame('filename_too_long', $rule->failedReason());
+        try {
+            $adapter->write($path, 'test');
+            $url = $adapter->cdnUrl($path) ?? $adapter->url($path);
 
-        $adapter->delete($path);
+            $rule = OssFile::make()->filenameMaxLength(50);
+            $failed = false;
+            $rule->validate('url', $url, function () use (&$failed) {
+                $failed = true;
+            });
+            $this->assertTrue($failed);
+            $this->assertSame('filename_too_long', $rule->failedReason());
+        } finally {
+            $adapter->delete($path);
+        }
     }
 
     public function testQueryMethods(): void
     {
         $adapter = $this->getOssAdapter();
-        $path = 'uploads/images/test.jpg';
-        $adapter->write($path, 'test');
-        $url = $adapter->cdnUrl($path) ?? $adapter->url($path);
+        $path = $this->testPath('images/test.jpg');
 
-        $rule = new OssFile();
-        $rule->validate('url', $url, function() {});
+        try {
+            $adapter->write($path, 'test');
+            $url = $adapter->cdnUrl($path) ?? $adapter->url($path);
 
-        $this->assertNotNull($rule->path());
-        $this->assertSame('test.jpg', $rule->filename());
-        $this->assertSame('jpg', $rule->extension());
-        $this->assertNotNull($rule->getDirectory());
-        $this->assertNotNull($rule->domainType());
-        $this->assertNotNull($rule->fileAttributes());
+            $rule = new OssFile();
+            $rule->validate('url', $url, function () {
+            });
 
-        $adapter->delete($path);
+            $this->assertNotNull($rule->path());
+            $this->assertSame('test.jpg', $rule->filename());
+            $this->assertSame('jpg', $rule->extension());
+            $this->assertNotNull($rule->getDirectory());
+            $this->assertNotNull($rule->domainType());
+            $this->assertNotNull($rule->fileAttributes());
+        } finally {
+            $adapter->delete($path);
+        }
     }
 
     public function testQueryMethodsBeforeValidation(): void

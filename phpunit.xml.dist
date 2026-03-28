@@ -16,6 +16,7 @@
     <env name="ALIOSS_UPLOAD_BASE_URL" value="" force="false"/>
     <env name="ALIOSS_SECURITY_TOKEN" value="" force="false"/>
     <env name="ALIOSS_PREFIX" value="" force="false"/>
+    <env name="ALIOSS_TEST_PATH_PREFIX" value="Test/LaravelAlioss/GitHubActions" force="false"/>
   </php>
   <source>
     <include>

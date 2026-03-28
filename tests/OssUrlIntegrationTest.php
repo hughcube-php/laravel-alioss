@@ -24,13 +24,13 @@ class OssUrlIntegrationTest extends TestCase
         if (!self::$initialized) {
             $adapter = $this->getOssAdapter();
 
-            // 上传一张真实 PNG 图片（1x1 像素红色）
-            self::$imagePath = 'test/oss-url-test-' . Str::random(16) . '.png';
+            // 上传一张真实 PNG 图片（100x100 像素红色）
+            self::$imagePath = $this->testPath('oss-url-test-' . Str::random(16) . '.png');
             $png = $this->createTestPng();
             $adapter->write(self::$imagePath, $png);
 
             // 上传一个文本文件
-            self::$textPath = 'test/oss-url-test-' . Str::random(16) . '.txt';
+            self::$textPath = $this->testPath('oss-url-test-' . Str::random(16) . '.txt');
             $adapter->write(self::$textPath, 'Hello OSS URL Integration Test');
 
             self::$initialized = true;
@@ -380,7 +380,7 @@ class OssUrlIntegrationTest extends TestCase
     // ==================== 辅助方法 ====================
 
     /**
-     * 创建 1x1 像素红色 PNG
+     * 创建 100x100 像素红色 PNG
      */
     private function createTestPng(): string
     {

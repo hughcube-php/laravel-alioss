@@ -11,6 +11,23 @@ use PHPUnit\Framework\Attributes\DataProvider;
 
 class OssAdapterTest extends TestCase
 {
+    /**
+     * 验证测试路径前缀的读写权限，确保 CI 环境凭据配置正确。
+     */
+    public function testTestPathPrefixIsReadWritable(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $path = $this->testPath('rw-check-' . Str::random(8) . '.txt');
+
+        try {
+            $adapter->write($path, 'rw-check');
+            $this->assertTrue($adapter->fileExists($path));
+            $this->assertSame('rw-check', $adapter->read($path));
+        } finally {
+            $adapter->delete($path);
+        }
+    }
+
     public function testClient(): void
     {
         $this->assertInstanceOf(Oss\Client::class, $this->getOssAdapter()->client());
@@ -113,21 +130,21 @@ class OssAdapterTest extends TestCase
     public function testSignUrl(): void
     {
         $adapter = $this->getOssAdapter();
-        $url = $adapter->signUrl('test/file.jpg', 60);
+        $url = $adapter->signUrl($this->testPath('file.jpg'), 60);
         $this->assertStringContainsString('x-oss-signature', (string) $url);
     }
 
     public function testSignUploadUrl(): void
     {
         $adapter = $this->getOssAdapter();
-        $url = $adapter->signUploadUrl('test/file.jpg', 60);
+        $url = $adapter->signUploadUrl($this->testPath('file.jpg'), 60);
         $this->assertStringContainsString('x-oss-signature', (string) $url);
     }
 
     public function testPresign(): void
     {
         $adapter = $this->getOssAdapter();
-        $result = $adapter->presign('test/file.jpg', 60, 'GET');
+        $result = $adapter->presign($this->testPath('file.jpg'), 60, 'GET');
         $this->assertInstanceOf(Oss\Models\PresignResult::class, $result);
         $this->assertNotEmpty($result->url);
         $this->assertNotEmpty($result->method);
@@ -203,93 +220,113 @@ class OssAdapterTest extends TestCase
     public function testWriteAndRead(): void
     {
         $adapter = $this->getOssAdapter();
-        $path = 'test/' . Str::random(32) . '.txt';
+        $path = $this->testPath(Str::random(32) . '.txt');
         $content = Str::random();
 
-        $adapter->write($path, $content);
-        $this->assertTrue($adapter->fileExists($path));
-        $this->assertSame($content, $adapter->read($path));
-
-        $adapter->delete($path);
-        $this->assertFalse($adapter->fileExists($path));
+        try {
+            $adapter->write($path, $content);
+            $this->assertTrue($adapter->fileExists($path));
+            $this->assertSame($content, $adapter->read($path));
+        } finally {
+            $adapter->delete($path);
+        }
     }
 
     public function testWriteStreamAndReadStream(): void
     {
         $adapter = $this->getOssAdapter();
-        $path = 'test/' . Str::random(32) . '.txt';
+        $path = $this->testPath(Str::random(32) . '.txt');
         $content = Str::random();
 
         $stream = fopen('php://temp', 'w+b');
         fwrite($stream, $content);
         rewind($stream);
 
-        $adapter->writeStream($path, $stream);
-        if (is_resource($stream)) fclose($stream);
+        try {
+            $adapter->writeStream($path, $stream);
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
 
-        $readStream = $adapter->readStream($path);
-        $this->assertIsResource($readStream);
-        $this->assertSame($content, stream_get_contents($readStream));
-        fclose($readStream);
-
-        $adapter->delete($path);
+            $readStream = $adapter->readStream($path);
+            $this->assertIsResource($readStream);
+            $this->assertSame($content, stream_get_contents($readStream));
+            fclose($readStream);
+        } finally {
+            $adapter->delete($path);
+        }
     }
 
     public function testCopyAndMove(): void
     {
         $adapter = $this->getOssAdapter();
-        $source = 'test/' . Str::random(32) . '.txt';
-        $copyDest = 'test/' . Str::random(32) . '-copy.txt';
-        $moveDest = 'test/' . Str::random(32) . '-move.txt';
+        $source = $this->testPath(Str::random(32) . '.txt');
+        $copyDest = $this->testPath(Str::random(32) . '-copy.txt');
+        $moveDest = $this->testPath(Str::random(32) . '-move.txt');
 
-        $adapter->write($source, 'content');
-        $adapter->copy($source, $copyDest);
-        $this->assertTrue($adapter->fileExists($copyDest));
+        try {
+            $adapter->write($source, 'content');
+            $adapter->copy($source, $copyDest);
+            $this->assertTrue($adapter->fileExists($copyDest));
 
-        $adapter->move($source, $moveDest);
-        $this->assertFalse($adapter->fileExists($source));
-        $this->assertTrue($adapter->fileExists($moveDest));
-
-        $adapter->delete($copyDest);
-        $adapter->delete($moveDest);
+            $adapter->move($source, $moveDest);
+            $this->assertFalse($adapter->fileExists($source));
+            $this->assertTrue($adapter->fileExists($moveDest));
+        } finally {
+            foreach ([$source, $copyDest, $moveDest] as $p) {
+                try {
+                    $adapter->delete($p);
+                } catch (\Throwable $e) {
+                }
+            }
+        }
     }
 
     public function testFileAttributes(): void
     {
         $adapter = $this->getOssAdapter();
-        $path = 'test/' . Str::random(32) . '.txt';
+        $path = $this->testPath(Str::random(32) . '.txt');
         $content = Str::random(50);
 
-        $adapter->write($path, $content);
-        $attrs = $adapter->fileAttributes($path);
-        $this->assertSame(strlen($content), $attrs->fileSize());
-        $this->assertNotNull($attrs->mimeType());
-        $this->assertNotNull($attrs->lastModified());
-
-        $adapter->delete($path);
+        try {
+            $adapter->write($path, $content);
+            $attrs = $adapter->fileAttributes($path);
+            $this->assertSame(strlen($content), $attrs->fileSize());
+            $this->assertNotNull($attrs->mimeType());
+            $this->assertNotNull($attrs->lastModified());
+        } finally {
+            $adapter->delete($path);
+        }
     }
 
     public function testVisibility(): void
     {
         $adapter = $this->getOssAdapter();
-        $path = 'test/' . Str::random(32) . '.txt';
-        $adapter->write($path, 'content');
+        $path = $this->testPath(Str::random(32) . '.txt');
 
-        foreach ([Visibility::PUBLIC, Visibility::PRIVATE] as $v) {
-            $adapter->setVisibility($path, $v);
-            $this->assertSame($v, $adapter->visibility($path)->visibility());
+        try {
+            $adapter->write($path, 'content');
+
+            foreach ([Visibility::PUBLIC, Visibility::PRIVATE] as $v) {
+                $adapter->setVisibility($path, $v);
+                $this->assertSame($v, $adapter->visibility($path)->visibility());
+            }
+        } finally {
+            $adapter->delete($path);
         }
-
-        $adapter->delete($path);
     }
 
     public function testCreateDirectory(): void
     {
         $adapter = $this->getOssAdapter();
-        $path = 'test-dir-' . Str::random(16);
-        $adapter->createDirectory($path);
-        $this->assertTrue($adapter->fileExists($path . '/'));
-        $adapter->delete($path . '/');
+        $path = $this->testPath('dir-' . Str::random(16));
+
+        try {
+            $adapter->createDirectory($path);
+            $this->assertTrue($adapter->fileExists($path . '/'));
+        } finally {
+            $adapter->delete($path . '/');
+        }
     }
 
     public function testDirectoryExists(): void
@@ -314,7 +351,7 @@ class OssAdapterTest extends TestCase
     public function testWriteFile(): void
     {
         $adapter = $this->getOssAdapter();
-        $path = 'test/' . Str::random(32) . '.txt';
+        $path = $this->testPath(Str::random(32) . '.txt');
         $tmpFile = sys_get_temp_dir() . '/' . Str::random(16) . '.txt';
         file_put_contents($tmpFile, 'test content');
 
@@ -322,26 +359,30 @@ class OssAdapterTest extends TestCase
             $url = $adapter->writeFile($tmpFile, $path);
             $this->assertStringContainsString($path, (string) $url);
             $this->assertSame('test content', $adapter->read($path));
-            $adapter->delete($path);
         } finally {
-            if (file_exists($tmpFile)) unlink($tmpFile);
+            $adapter->delete($path);
+            if (file_exists($tmpFile)) {
+                unlink($tmpFile);
+            }
         }
     }
 
     public function testDownload(): void
     {
         $adapter = $this->getOssAdapter();
-        $path = 'test/' . Str::random(32) . '.txt';
+        $path = $this->testPath(Str::random(32) . '.txt');
         $content = Str::random(100);
-        $adapter->write($path, $content);
 
         $tmpFile = sys_get_temp_dir() . '/' . Str::random(16) . '.txt';
         try {
+            $adapter->write($path, $content);
             $adapter->download($path, $tmpFile);
             $this->assertSame($content, file_get_contents($tmpFile));
         } finally {
             $adapter->delete($path);
-            if (file_exists($tmpFile)) unlink($tmpFile);
+            if (file_exists($tmpFile)) {
+                unlink($tmpFile);
+            }
         }
     }
 

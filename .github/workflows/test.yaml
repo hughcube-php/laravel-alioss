@@ -22,6 +22,7 @@ jobs:
       ALIOSS_UPLOAD_BASE_URL: ${{ secrets.ALIOSS_UPLOAD_BASE_URL }}
       ALIOSS_SECURITY_TOKEN: ''
       ALIOSS_PREFIX: ''
+      ALIOSS_TEST_PATH_PREFIX: ${{ secrets.ALIOSS_TEST_PATH_PREFIX }}
     steps: &common_steps
       - name: Checkout
         uses: actions/checkout@master

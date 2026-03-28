@@ -121,7 +121,7 @@ class OssUrlTest extends TestCase
     public function testSign(): void
     {
         $adapter = $this->getOssAdapter();
-        $url = $adapter->ossUrl('test/file.jpg');
+        $url = $adapter->ossUrl($this->testPath('file.jpg'));
         $signed = $url->sign(60);
         $this->assertStringContainsString('x-oss-signature', (string) $signed);
     }
@@ -129,7 +129,7 @@ class OssUrlTest extends TestCase
     public function testSignUpload(): void
     {
         $adapter = $this->getOssAdapter();
-        $url = $adapter->ossUrl('test/file.jpg');
+        $url = $adapter->ossUrl($this->testPath('file.jpg'));
         $signed = $url->signUpload(60);
         $this->assertStringContainsString('x-oss-signature', (string) $signed);
     }
