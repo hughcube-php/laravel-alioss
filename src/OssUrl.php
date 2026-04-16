@@ -185,6 +185,32 @@ class OssUrl extends HUrl
     }
 
     /**
+     * 获取视频元信息（VideoMeta、AudioMeta、Streams、FileSize、Format 等）。
+     *
+     * 文件不存在或非视频返回 null。
+     *
+     * @param int|null $timeout 超时秒数，null 使用 SDK 默认配置
+     * @return array|null
+     */
+    public function fetchVideoInfo(?int $timeout = null): ?array
+    {
+        return $this->adapter?->fetchVideoInfo('/' . $this->key(), $timeout);
+    }
+
+    /**
+     * 获取音频元信息（AudioMeta、Streams、FileSize、Format 等）。
+     *
+     * 文件不存在或非音频返回 null。
+     *
+     * @param int|null $timeout 超时秒数，null 使用 SDK 默认配置
+     * @return array|null
+     */
+    public function fetchAudioInfo(?int $timeout = null): ?array
+    {
+        return $this->adapter?->fetchAudioInfo('/' . $this->key(), $timeout);
+    }
+
+    /**
      * 检测文件是否存在。
      *
      * @param int|null $timeout 超时秒数，null 使用 SDK 默认配置
@@ -297,7 +323,11 @@ class OssUrl extends HUrl
             'expires' => new \DateInterval("PT{$timeout}S"),
         ]);
 
-        $result = static::from($this->adapter, $presignResult->url);
+        // 从 presign URL 中提取签名参数，保留当前 OssUrl 的域名
+        $presignQuery = parse_url($presignResult->url, PHP_URL_QUERY) ?? '';
+
+        /** @var static $result */
+        $result = $this->withQuery($presignQuery);
 
         // 异步参数不参与签名，追加到 URL 后
         $asyncValue = $this->extractQueryParam('x-oss-async-process');

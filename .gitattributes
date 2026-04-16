@@ -1,5 +1,8 @@
 * text=auto
 
+*.mp4 binary
+*.png binary
+
 /tests export-ignore
 .gitattributes export-ignore
 .gitignore export-ignore

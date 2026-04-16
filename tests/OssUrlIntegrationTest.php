@@ -16,6 +16,7 @@ class OssUrlIntegrationTest extends TestCase
 {
     private static ?string $imagePath = null;
     private static ?string $textPath = null;
+    private static ?string $videoPath = null;
     private static bool $initialized = false;
 
     /** @var array<string> 记录所有创建的文件路径，tearDownAfterClass 统一清理 */
@@ -52,6 +53,14 @@ class OssUrlIntegrationTest extends TestCase
             $adapter->write(self::$textPath, 'Hello OSS URL Integration Test');
             self::$createdPaths[] = self::$textPath;
 
+            // 上传一段真实 MP4 视频（1 秒，32x32，h264）
+            $fixture = __DIR__ . '/fixtures/test.mp4';
+            if (is_file($fixture)) {
+                self::$videoPath = $this->testPath('oss-url-test-' . Str::random(16) . '.mp4');
+                $adapter->write(self::$videoPath, file_get_contents($fixture));
+                self::$createdPaths[] = self::$videoPath;
+            }
+
             self::$initialized = true;
         }
     }
@@ -71,6 +80,7 @@ class OssUrlIntegrationTest extends TestCase
         self::$createdPaths = [];
         self::$imagePath = null;
         self::$textPath = null;
+        self::$videoPath = null;
         self::$initialized = false;
         self::$adapterConfig = null;
     }
@@ -439,6 +449,46 @@ class OssUrlIntegrationTest extends TestCase
         $url = $adapter->ossUrl(self::$textPath);
 
         $this->assertNull($url->fetchImageInfo());
+    }
+
+    public function testFetchVideoInfo(): void
+    {
+        if (self::$videoPath === null) {
+            $this->markTestSkipped('Video fixture not available');
+        }
+
+        $adapter = $this->getOssAdapter();
+        $url = $adapter->ossUrl(self::$videoPath);
+        $info = $url->fetchVideoInfo();
+
+        // video/info 需要 OSS Bucket 绑定 IMM 项目，未绑定时 OSS 返回 404
+        // 与文件不存在的错误无法区分，所以此处容忍 null 并跳过
+        if ($info === null) {
+            $this->markTestSkipped('Bucket does not have IMM binding for video/info');
+        }
+
+        $this->assertArrayHasKey('VideoStreams', $info);
+        $this->assertNotEmpty($info['VideoStreams']);
+        $this->assertArrayHasKey('Duration', $info);
+        $this->assertGreaterThan(0, (float) $info['Duration']);
+        $this->assertArrayHasKey('Size', $info);
+        $this->assertGreaterThan(0, (int) $info['Size']);
+    }
+
+    public function testFetchVideoInfoReturnsNullForNonVideo(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $url = $adapter->ossUrl(self::$textPath);
+
+        $this->assertNull($url->fetchVideoInfo());
+    }
+
+    public function testFetchVideoInfoReturnsNullForNonExistent(): void
+    {
+        $adapter = $this->getOssAdapter();
+        $url = $adapter->ossUrl($this->testPath('nonexistent-' . Str::random(16) . '.mp4'));
+
+        $this->assertNull($url->fetchVideoInfo());
     }
 
     public function testExists(): void

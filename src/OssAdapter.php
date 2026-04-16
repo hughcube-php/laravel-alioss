@@ -609,6 +609,48 @@ class OssAdapter implements FilesystemAdapter
      */
     public function fetchImageInfo($pathOrUrl, ?int $timeout = null): ?array
     {
+        return $this->fetchProcessJson($pathOrUrl, 'image/info', $timeout);
+    }
+
+    /**
+     * 获取视频元信息（VideoMeta、AudioMeta、Streams、FileSize、Format 等）。
+     *
+     * 自动识别参数：传入 path 或完整 URL 均可。
+     * 文件不存在或非视频返回 null。
+     *
+     * @param string|UriInterface $pathOrUrl OSS path、URL 字符串或 UriInterface 对象
+     * @return array|null
+     */
+    public function fetchVideoInfo($pathOrUrl, ?int $timeout = null): ?array
+    {
+        return $this->fetchProcessJson($pathOrUrl, 'video/info', $timeout);
+    }
+
+    /**
+     * 获取音频元信息（AudioMeta、Streams、FileSize、Format 等）。
+     *
+     * 自动识别参数：传入 path 或完整 URL 均可。
+     * 文件不存在或非音频返回 null。
+     *
+     * @param string|UriInterface $pathOrUrl OSS path、URL 字符串或 UriInterface 对象
+     * @return array|null
+     */
+    public function fetchAudioInfo($pathOrUrl, ?int $timeout = null): ?array
+    {
+        return $this->fetchProcessJson($pathOrUrl, 'audio/info', $timeout);
+    }
+
+    /**
+     * 执行 OSS 数据处理并解析 JSON 响应（info 系列接口的公共实现）。
+     *
+     * 文件不存在（404）或不匹配处理类型（400）统一返回 null。
+     *
+     * @param string|UriInterface $pathOrUrl OSS path、URL 字符串或 UriInterface 对象
+     * @param string $process x-oss-process 参数值，如 `image/info`、`video/info`、`audio/info`
+     * @return array|null
+     */
+    private function fetchProcessJson($pathOrUrl, string $process, ?int $timeout = null): ?array
+    {
         $key = $this->resolveAny($pathOrUrl);
         if ($key === null) {
             return null;
@@ -619,7 +661,7 @@ class OssAdapter implements FilesystemAdapter
                 new Oss\Models\GetObjectRequest(
                     bucket: $this->bucket(),
                     key: $key,
-                    process: 'image/info',
+                    process: $process,
                 ),
                 $this->buildRequestOptions($timeout)
             );
