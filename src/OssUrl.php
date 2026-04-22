@@ -917,6 +917,25 @@ class OssUrl extends HUrl
     }
 
     /**
+     * 生成视频封面的预签名 URL（常用于列表/详情页 `<img>` 直接渲染）。
+     *
+     * 内部相当于：`clearProcess()->videoSnapshot($timeMs, null, null, 'jpg', 'fast')->sign($ttl)->toString()`
+     * 即先清掉当前 URL 上可能存在的处理参数和旧签名，再追加 video/snapshot 截帧并签名。
+     *
+     * @param int $timeMs 截帧时间点，单位毫秒，默认 1000（第 1 秒，避开常见黑屏首帧）
+     * @param int $ttl 签名有效期，单位秒，默认 86400（24 小时）
+     * @return string 带 x-oss-process=video/snapshot + OSS V4 签名的可访问 URL
+     * @throws Exception
+     */
+    public function signVideoCover(int $timeMs = 1000, int $ttl = 86400): string
+    {
+        return $this->clearProcess()
+            ->videoSnapshot($timeMs, null, null, 'jpg', 'fast')
+            ->sign($ttl)
+            ->toString();
+    }
+
+    /**
      * 视频转码（异步操作）。
      *
      * @param string $format 目标格式，枚举值：`mp4`、`flv`、`avi`、`m3u8` 等
